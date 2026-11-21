@@ -4,55 +4,29 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Address;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
-
-final class ResetPassword extends Mailable
+final class ResetPassword extends TransactionalEmail
 {
-    use Queueable, SerializesModels;
-
-    public function __construct(public readonly string $url)
+    protected function mailSubject(): string
     {
-        $this->text('mail.plain', ['body' => $this->textBody()]);
+        return 'Reset your password';
     }
 
-    public function envelope(): Envelope
+    protected function intro(): string
     {
-        return new Envelope(
-            subject: 'Reset your password',
-            from: new Address('noreply@infinityproject.fr', 'Infinity Project'),
-            replyTo: [new Address('contact@infinityproject.fr', 'Infinity Project')],
-        );
+        return 'A password reset was requested for your Infinity URL account.';
     }
 
-    public function content(): Content
+    protected function ctaLabel(): string
     {
-        return new Content(htmlString: $this->htmlBody());
+        return 'Choose a new password';
     }
 
-    private function htmlBody(): string
+    protected function expiry(): string
     {
-        $url = htmlspecialchars($this->url, ENT_QUOTES);
-
-        return <<<HTML
-            <!doctype html>
-            <html lang="en">
-            <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
-            <p>Hello,</p>
-            <p>A password reset was requested for your Infinity URL account.</p>
-            <p><a href="{$url}">Choose a new password</a></p>
-            <p>This link expires in one hour. If you did not request it, ignore this message.</p>
-            <p>Infinity Project</p>
-            </body>
-            </html>
-            HTML;
+        return 'This link expires in one hour. If you did not request it, ignore this message.';
     }
 
-    private function textBody(): string
+    protected function textBody(): string
     {
         return "Hello,\n\nA password reset was requested for your Infinity URL account.\n"
             ."Choose a new password:\n".$this->url
