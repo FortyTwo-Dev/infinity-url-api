@@ -52,7 +52,7 @@ L'ordre est dicté par le risque, pas par la dépendance technique. **Les domain
 | Étape | Contenu | Estimation |
 | --- | --- | --- |
 | S0 — Fondations | Dépôt, `LICENSE` AGPL-3.0-only, CI (lint, tests, audit de licences), compose de dev, healthchecks, squelette Laravel + Nuxt avec `@infinitylib/infinity-theme` et `@infinitylib/infinity-theme-vue` installés dès le départ, **spike de 30 min sur le WASM QR** (D-95). Inclut : correction du certificat de l'apex `infinityproject.fr` | 8–10 h |
-| S1 — Chemin chaud | Schéma Postgres, route de redirection isolée (sans session), cache Valkey, negative cache, singleflight | 16–24 h |
+| S1 — Chemin chaud | **Contrainte d'hôte** (sur `iurl.fr`, seules la redirection et les pages d'erreur répondent), schéma Postgres, route de redirection isolée (sans session), cache Valkey, negative cache, singleflight | 18–26 h |
 | S2 — Liens et slugs | CRUD, génération, réservation, tombstones, API tokens, **OpenAPI généré** (`dedoc/scramble`) et types TS générés côté web. Inclut les compléments de compte issus de la matrice de cas d'usage : renvoi d'email, changement de mot de passe, suppression de compte, désactivation 2FA, codes de récupération, révocation des sessions. Inclut **chiffrement de l'email + index aveugle** et **`GET /me/export`** | 27–38 h |
 | S3 — Analytics | File Horizon, dédup HMAC, compteurs, filtrage bots (`device-detector`), job de rétention, rotation et destruction du sel. **Le pays n'est pas traité en v0.1** (D-120) : la colonne existe, la dimension reste vide | 20–30 h |
 | S4 — Dashboard | Liste, création, édition, page de stats (un graphique suffit), **export CSV**, QR via `@infinitylib/iqrcode-wasm` | 26–34 h |

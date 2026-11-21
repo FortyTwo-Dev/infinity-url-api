@@ -79,11 +79,15 @@ la précédente soit verte.
 | Étape | Contenu | Terminé quand |
 | --- | --- | --- |
 | S0 | Dépôt, licence, CI, compose, squelette | `php artisan test` vert, CI verte |
-| S1 | Chemin chaud de redirection | `GET /{slug}` répond 302, cache, sans `Set-Cookie` |
+| S1 | Contrainte d'hôte et chemin chaud de redirection | sur `iurl.fr`, `GET /{slug}` répond 302 sans `Set-Cookie`, et tout le reste répond 404 |
 | S2 | Liens, slugs, jetons, compte | CRUD vert, OpenAPI généré |
 | S3 | Pipeline analytique | un clic produit les compteurs, un retry n'en double aucun |
-| S4 | Abus | score de destination, `POST /report`, takedown |
-| S5 | Légal et docs | pages publiées, quickstart self-host vérifié |
+| S4 | *(dépôt `infinity-url`)* Dashboard et QR | hors périmètre de ce dépôt |
+| S5 | Abus | score de destination, `POST /report`, takedown |
+| S6 | Légal et docs | pages publiées, quickstart self-host vérifié |
+
+La numérotation est celle de `docs/02-mvp-v0.1.md` : une seule liste, pour les deux
+dépôts. Ne pas la renuméroter ici.
 
 ## Ce qui est interdit
 
