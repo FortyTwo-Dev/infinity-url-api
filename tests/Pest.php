@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\Cache;
+use Tests\Support\ApiHelpers;
 use Tests\TestCase;
 
 /*
@@ -16,7 +17,7 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)
-    ->use(DatabaseTruncation::class)
+    ->use(DatabaseTruncation::class, ApiHelpers::class)
     ->beforeEach(fn () => Cache::flush())
     ->in('Feature', 'Architecture');
 

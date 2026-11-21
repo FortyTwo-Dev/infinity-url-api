@@ -5,4 +5,4 @@ Decisions taken in this repository, newest last. Each record follows
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| - | *(no records yet)* | - |
+| [0001](0001-s2-links-and-slugs.md) | S2 account, token and link implementation choices | accepted |
