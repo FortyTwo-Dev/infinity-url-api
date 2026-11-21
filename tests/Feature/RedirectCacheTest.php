@@ -204,9 +204,10 @@ dataset('malformed redirect cache values', [
 
 it('replaces a malformed cache value from postgres', function (array $cached): void {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
+    $destination = 'https://example.com/malformed';
     Link::factory()->forDomain($domain)->create([
         'slug' => 'malformed1',
-        'destination' => 'https://example.com/malformed',
+        'destination' => $destination,
     ]);
 
     $key = 'link:iurl.fr:malformed1';
@@ -214,12 +215,12 @@ it('replaces a malformed cache value from postgres', function (array $cached): v
 
     $this->get('https://iurl.fr/malformed1')
         ->assertStatus(302)
-        ->assertHeader('Location', 'https://example.com/malformed');
+        ->assertHeader('Location', $destination);
 
     $rewritten = Cache::get($key);
 
     expect(data_get($rewritten, 'status'))->toBe(302);
-    expect(data_get($rewritten, 'location'))->toBe('https://example.com/malformed');
+    expect(data_get($rewritten, 'location'))->toBe($destination);
 })->with('malformed redirect cache values');
 
 it('invalidates the cache when a link destination is updated', function () {

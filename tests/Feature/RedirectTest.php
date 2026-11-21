@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
+const EXPIRED_LINK_TEXT = 'Ce lien a expiré.';
+
 it('redirects an active link with the privacy headers and no body', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     Link::factory()->forDomain($domain)->create([
@@ -45,7 +47,7 @@ it('answers 410 for an expired link', function () {
     $response = $this->get('https://iurl.fr/expired1');
 
     $response->assertStatus(410);
-    $response->assertSee('Ce lien a expiré.', false);
+    $response->assertSee(EXPIRED_LINK_TEXT, false);
 });
 
 it('answers 410 for a disabled link', function () {
@@ -58,7 +60,7 @@ it('answers 410 for a disabled link', function () {
     $response = $this->get('https://iurl.fr/disabled1');
 
     $response->assertStatus(410);
-    $response->assertSee('Ce lien a expiré.', false);
+    $response->assertSee(EXPIRED_LINK_TEXT, false);
 });
 
 it('answers 403 for a blocked link', function () {
@@ -158,7 +160,7 @@ it('answers 410 when expires_at is exactly now', function () {
     $response = $this->get('https://iurl.fr/expiresnow1');
 
     $response->assertStatus(410);
-    $response->assertSee('Ce lien a expiré.', false);
+    $response->assertSee(EXPIRED_LINK_TEXT, false);
 });
 
 it('enforces the slug length boundaries', function () {
