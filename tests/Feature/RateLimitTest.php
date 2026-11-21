@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Models\Workspace;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 
@@ -24,9 +23,7 @@ function assertIetfRateLimitHeaders(TestResponse $response): void
 }
 
 it('answers 429 on the eleventh wrong password', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'bruteforce@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('bruteforce@example.com');
 
     for ($attempt = 1; $attempt <= 10; $attempt++) {
         $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
@@ -40,9 +37,7 @@ it('answers 429 on the eleventh wrong password', function () {
         'password' => 'wrong-password',
     ]);
 
-    $limited->assertStatus(429);
-    expect((string) $limited->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($limited->json('code'))->toBe('rate_limited');
+    $this->assertProblem($limited, 429, 'rate_limited');
     expect((string) $limited->headers->get('RateLimit-Limit'))->toBe('10');
     expect((string) $limited->headers->get('RateLimit-Remaining'))->toBe('0');
     expect((int) $limited->headers->get('RateLimit-Reset'))->toBeGreaterThanOrEqual(0);
@@ -50,17 +45,11 @@ it('answers 429 on the eleventh wrong password', function () {
 });
 
 it('exposes ietf rate limit headers on a successful call', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'headers@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('headers@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'headers@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
+    $accessToken = $this->loginSession('headers@example.com')->accessToken;
 
-    $response = $this->withToken($login->json('access_token'))
+    $response = $this->withToken($accessToken)
         ->getJson('https://api.url.infinityproject.fr/v1/me');
 
     $response->assertStatus(200);
@@ -88,8 +77,7 @@ it('answers 429 on the third registration from the same address', function () {
         'password' => 'correct horse battery',
     ]);
 
-    $limited->assertStatus(429);
-    expect($limited->json('code'))->toBe('rate_limited');
+    $this->assertProblem($limited, 429, 'rate_limited');
     expect($limited->headers->get('Retry-After'))->not->toBeNull();
     expect(User::count())->toBe(2);
 });
@@ -97,9 +85,8 @@ it('answers 429 on the third registration from the same address', function () {
 it('answers 429 on the fourth verification resend within an hour', function () {
     Mail::fake();
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->unverified()->create(['email' => 'resendlimit@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('resendlimit@example.com');
+    $user->forceFill(['email_verified_at' => null])->save();
 
     for ($attempt = 1; $attempt <= 3; $attempt++) {
         $this->postJson('https://api.url.infinityproject.fr/v1/auth/verification/resend', [
@@ -111,9 +98,7 @@ it('answers 429 on the fourth verification resend within an hour', function () {
         'email' => 'resendlimit@example.com',
     ]);
 
-    $limited->assertStatus(429);
-    expect((string) $limited->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($limited->json('code'))->toBe('rate_limited');
+    $this->assertProblem($limited, 429, 'rate_limited');
     expect($limited->headers->get('Retry-After'))->not->toBeNull();
 });
 

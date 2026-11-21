@@ -1,14 +1,10 @@
 <?php
 
-use App\Models\User;
-use App\Models\Workspace;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 it('returns the account, its workspace, its limits and its capabilities', function () {
-    $workspace = Workspace::factory()->create(['name' => 'My workspace']);
-    $user = User::factory()->create(['email' => 'me@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [$workspace, $user] = $this->account('me@example.com', ['name' => 'My workspace']);
 
     Sanctum::actingAs($user, ['me:read']);
 
@@ -54,23 +50,17 @@ it('returns the account, its workspace, its limits and its capabilities', functi
 it('answers 401 without a token', function () {
     $response = $this->getJson('https://api.url.infinityproject.fr/v1/me');
 
-    $response->assertStatus(401);
-    expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($response->json('code'))->toBe('unauthorized');
+    $this->assertProblem($response, 401, 'unauthorized');
     expect($response->json('instance'))->toBe('/v1/me');
 });
 
 it('answers 403 when the token lacks the me read ability', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create();
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account();
 
     Sanctum::actingAs($user, ['links:read']);
 
     $response = $this->getJson('https://api.url.infinityproject.fr/v1/me');
 
-    $response->assertStatus(403);
-    expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($response->json('code'))->toBe('scope_missing');
+    $this->assertProblem($response, 403, 'scope_missing');
     expect($response->json('instance'))->toBe('/v1/me');
 });

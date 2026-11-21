@@ -16,6 +16,23 @@ function slugGenerationDomain(): Domain
     return Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
 }
 
+/**
+ * A generator whose draws return "aaaaaaa" then "baaaaaa": the first attempt
+ * collides, the second one succeeds.
+ */
+function slugGeneratorWithDraws(): SlugGenerator
+{
+    $draws = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
+    $position = 0;
+
+    return new SlugGenerator(
+        app(ReservedSlugs::class),
+        function (int $max) use (&$draws, &$position): int {
+            return $draws[$position++] ?? 0;
+        },
+    );
+}
+
 it('generates seven-character slugs from the lowercase alphabet', function () {
     $domain = slugGenerationDomain();
     $generator = app(SlugGenerator::class);
@@ -58,15 +75,7 @@ it('retries with a fresh draw sequence when the slug already exists', function (
 
     Link::factory()->forDomain($domain)->create(['slug' => 'aaaaaaa']);
 
-    $draws = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
-    $position = 0;
-
-    $generator = new SlugGenerator(
-        app(ReservedSlugs::class),
-        function (int $max) use (&$draws, &$position): int {
-            return $draws[$position++] ?? 0;
-        },
-    );
+    $generator = slugGeneratorWithDraws();
 
     expect($generator->generate($domain))->toBe('baaaaaa');
 });
@@ -76,15 +85,7 @@ it('retries when the slug is reserved', function () {
 
     DB::table('reserved_slugs')->insert(['slug' => 'aaaaaaa']);
 
-    $draws = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
-    $position = 0;
-
-    $generator = new SlugGenerator(
-        app(ReservedSlugs::class),
-        function (int $max) use (&$draws, &$position): int {
-            return $draws[$position++] ?? 0;
-        },
-    );
+    $generator = slugGeneratorWithDraws();
 
     expect($generator->generate($domain))->toBe('baaaaaa');
 });
@@ -98,15 +99,7 @@ it('retries when the slug is tombstoned', function () {
         'erased_at' => now(),
     ]);
 
-    $draws = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
-    $position = 0;
-
-    $generator = new SlugGenerator(
-        app(ReservedSlugs::class),
-        function (int $max) use (&$draws, &$position): int {
-            return $draws[$position++] ?? 0;
-        },
-    );
+    $generator = slugGeneratorWithDraws();
 
     expect($generator->generate($domain))->toBe('baaaaaa');
 });

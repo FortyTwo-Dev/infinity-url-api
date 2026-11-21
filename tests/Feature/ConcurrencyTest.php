@@ -1,14 +1,11 @@
 <?php
 
-use App\Mail\ResetPassword;
 use App\Models\User;
-use App\Models\Workspace;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
-use PragmaRX\Google2FA\Google2FA;
 
 /**
  * Why the configuration guard exists: a spawned probe boots the application in
@@ -233,16 +230,9 @@ it('lets exactly one of two simultaneous refresh attempts rotate the cookie', fu
         $this->markTestSkipped($reason);
     }
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'concurrent-refresh@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('concurrent-refresh@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'concurrent-refresh@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $cookie = $login->getCookie('__Host-iurl_refresh', false)->getValue();
+    $cookie = $this->loginSession('concurrent-refresh@example.com')->cookie;
 
     $results = runConcurrentAuthRequests([
         [
@@ -268,8 +258,7 @@ it('lets exactly one of two simultaneous refresh attempts rotate the cookie', fu
     expect($winner['cookie'])->toBeString()->not->toBe('');
 
     // The replay revoked the whole family, including the token the winner got.
-    $this->withCredentials()
-        ->withUnencryptedCookie('__Host-iurl_refresh', $winner['cookie'])
+    $this->withRefreshCookie($winner['cookie'])
         ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh')
         ->assertStatus(401);
 });
@@ -279,23 +268,10 @@ it('lets exactly one of two simultaneous totp verifications consume the code', f
         $this->markTestSkipped($reason);
     }
 
-    $google2fa = new Google2FA;
-    $secret = $google2fa->generateSecretKey();
+    [, , $secret] = $this->totpAccount('concurrent-totp@example.com');
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'concurrent-totp@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-    $user->forceFill(['totp_secret' => $secret, 'totp_confirmed_at' => now()])->save();
-
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'concurrent-totp@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    expect($login->json('status'))->toBe('totp_required');
-
-    $challenge = $login->json('challenge');
-    $code = $google2fa->getCurrentOtp($secret);
+    $challenge = $this->challenge('concurrent-totp@example.com');
+    $code = $this->totpCode($secret);
 
     $results = runConcurrentAuthRequests([
         [
@@ -332,18 +308,9 @@ it('lets exactly one of two simultaneous password resets consume the token', fun
 
     Mail::fake();
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'concurrent-reset@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/password/forgot', [
-        'email' => 'concurrent-reset@example.com',
-    ])->assertStatus(202);
-
-    $resetUrl = Mail::sent(ResetPassword::class)->firstOrFail()->url;
-    parse_str((string) parse_url($resetUrl, PHP_URL_QUERY), $query);
-    $token = $query['token'] ?? '';
-    expect($token)->toBeString()->not->toBe('');
+    $user = $this->account('concurrent-reset@example.com')[1];
+    $this->requestReset('concurrent-reset@example.com');
+    $token = $this->resetToken();
 
     $results = runConcurrentAuthRequests([
         [
@@ -396,26 +363,14 @@ it('answers token_revoked for two consumed cookies of the same family replayed i
         $this->markTestSkipped($reason);
     }
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'concurrent-family@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('concurrent-family@example.com');
+    $cookieA = $this->loginSession('concurrent-family@example.com')->cookie;
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'concurrent-family@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $cookieA = $login->getCookie('__Host-iurl_refresh', false)->getValue();
-
-    $this->withCredentials();
-
-    $first = $this->withUnencryptedCookie('__Host-iurl_refresh', $cookieA)
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh');
+    $first = $this->refreshWith($cookieA);
     $first->assertStatus(200);
     $cookieB = $first->getCookie('__Host-iurl_refresh', false)->getValue();
 
-    $second = $this->withUnencryptedCookie('__Host-iurl_refresh', $cookieB)
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh');
+    $second = $this->refreshWith($cookieB);
     $second->assertStatus(200);
     $cookieC = $second->getCookie('__Host-iurl_refresh', false)->getValue();
 
@@ -451,25 +406,12 @@ it('serialises a concurrent 2fa disable and login verification on the same step'
         $this->markTestSkipped($reason);
     }
 
-    $google2fa = new Google2FA;
-    $secret = $google2fa->generateSecretKey();
-
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'concurrent-disable@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-    $user->forceFill(['totp_secret' => $secret, 'totp_confirmed_at' => now()])->save();
+    [, $user, $secret] = $this->totpAccount('concurrent-disable@example.com');
 
     $access = $user->createToken('dashboard', ['*'])->plainTextToken;
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'concurrent-disable@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    expect($login->json('status'))->toBe('totp_required');
-    $challenge = $login->json('challenge');
-
-    $code = $google2fa->getCurrentOtp($secret);
+    $challenge = $this->challenge('concurrent-disable@example.com');
+    $code = $this->totpCode($secret);
 
     $results = runConcurrentAuthRequests([
         [

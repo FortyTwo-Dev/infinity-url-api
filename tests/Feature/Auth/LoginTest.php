@@ -1,21 +1,9 @@
 <?php
 
-use App\Models\User;
-use App\Models\Workspace;
-use Laravel\Sanctum\Sanctum;
-use PragmaRX\Google2FA\Google2FA;
-
 it('logs in with an access token and a secure refresh cookie', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'login@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('login@example.com');
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'login@example.com',
-        'password' => 'password',
-    ]);
-
-    $response->assertStatus(200);
+    $response = $this->login('login@example.com');
 
     $body = $response->json();
     expect(array_keys($body))->toEqualCanonicalizing(['access_token', 'token_type', 'expires_in', 'user']);
@@ -41,9 +29,7 @@ it('logs in with an access token and a secure refresh cookie', function () {
 });
 
 it('answers the same unauthorized problem for a wrong password and an unknown address', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'victim@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('victim@example.com');
 
     $wrongPassword = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
         'email' => 'victim@example.com',
@@ -56,9 +42,7 @@ it('answers the same unauthorized problem for a wrong password and an unknown ad
     ]);
 
     foreach ([$wrongPassword, $unknownEmail] as $response) {
-        $response->assertStatus(401);
-        expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-        expect($response->json('code'))->toBe('unauthorized');
+        $this->assertProblem($response, 401, 'unauthorized');
         $response->assertCookieMissing('__Host-iurl_refresh');
     }
 
@@ -66,54 +50,34 @@ it('answers the same unauthorized problem for a wrong password and an unknown ad
 });
 
 it('accepts the access token on me and rejects the refresh token as a bearer', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'bearer@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('bearer@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'bearer@example.com',
-        'password' => 'password',
-    ]);
+    $session = $this->loginSession('bearer@example.com');
 
-    $login->assertStatus(200);
-
-    $accessToken = $login->json('access_token');
-    $refreshToken = $login->getCookie('__Host-iurl_refresh', false)->getValue();
-
-    $me = $this->withToken($accessToken)->getJson('https://api.url.infinityproject.fr/v1/me');
+    $me = $this->withToken($session->accessToken)->getJson('https://api.url.infinityproject.fr/v1/me');
     $me->assertStatus(200);
     expect($me->json('user.email'))->toBe('bearer@example.com');
 
     $this->app['auth']->forgetGuards();
 
-    $rejected = $this->withToken($refreshToken)->getJson('https://api.url.infinityproject.fr/v1/me');
+    $rejected = $this->withToken((string) $session->cookie)
+        ->getJson('https://api.url.infinityproject.fr/v1/me');
     expect($rejected->status())->toBeIn([401, 403]);
     expect($rejected->json('user'))->toBeNull();
 });
 
 it('asks for a totp challenge before issuing a session', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'twofactor@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('twofactor@example.com');
 
-    $google2fa = new Google2FA;
-
-    Sanctum::actingAs($user, ['me:write']);
-
-    $enable = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/enable');
-    $enable->assertStatus(200);
+    $enable = $this->enableTotp($user);
     $secret = $enable->json('secret');
-    expect($secret)->toBeString()->not->toBe('');
 
-    $confirm = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
-        'code' => $google2fa->getCurrentOtp($secret),
-    ]);
-    $confirm->assertStatus(200);
+    $confirm = $this->confirmTotp($secret);
     expect($confirm->json('recovery_codes'))->toHaveCount(10);
 
     // The confirmation consumed the current step; the next step stays inside
     // the accepted window and is not a replay.
-    $code = $google2fa->oathTotp($secret, $google2fa->getTimestamp() + 1);
+    $code = $this->nextTotpCode($secret);
 
     $this->app['auth']->forgetGuards();
 
@@ -148,8 +112,6 @@ it('asks for a totp challenge before issuing a session', function () {
         'code' => $code,
     ]);
 
-    $replay->assertStatus(422);
-    expect((string) $replay->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($replay->json('code'))->toBe('totp_invalid');
+    $this->assertProblem($replay, 422, 'totp_invalid');
     $replay->assertCookieMissing('__Host-iurl_refresh');
 });

@@ -1,19 +1,9 @@
 <?php
 
-use App\Models\User;
-use App\Models\Workspace;
-
 it('creates an api token, shows the secret once and enforces its scopes', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'token@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('token@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'token@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $accessToken = $login->json('access_token');
+    $accessToken = $this->loginSession('token@example.com')->accessToken;
 
     $response = $this->withToken($accessToken)
         ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
@@ -48,22 +38,13 @@ it('creates an api token, shows the secret once and enforces its scopes', functi
             'destination' => 'https://example.com/from-a-read-only-token',
         ]);
 
-    $forbidden->assertStatus(403);
-    expect((string) $forbidden->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($forbidden->json('code'))->toBe('scope_missing');
+    $this->assertProblem($forbidden, 403, 'scope_missing');
 });
 
 it('never returns the secret from the token list and hides dashboard sessions', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'list@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('list@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'list@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $accessToken = $login->json('access_token');
+    $accessToken = $this->loginSession('list@example.com')->accessToken;
 
     $this->withToken($accessToken)
         ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
@@ -92,16 +73,9 @@ it('never returns the secret from the token list and hides dashboard sessions', 
 });
 
 it('rejects wildcard, me write and unknown scopes', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'scopes@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('scopes@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'scopes@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $accessToken = $login->json('access_token');
+    $accessToken = $this->loginSession('scopes@example.com')->accessToken;
 
     foreach ([['*'], ['me:write'], ['unknown:read']] as $scopes) {
         $response = $this->withToken($accessToken)
@@ -110,24 +84,15 @@ it('rejects wildcard, me write and unknown scopes', function () {
                 'scopes' => $scopes,
             ]);
 
-        $response->assertStatus(422);
-        expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-        expect($response->json('code'))->toBe('validation_failed');
+        $this->assertProblem($response, 422, 'validation_failed');
         expect($response->json('errors'))->toHaveKey('scopes');
     }
 });
 
 it('refuses to grant a scope the minting token does not hold', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'escalate@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('escalate@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'escalate@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $accessToken = $login->json('access_token');
+    $accessToken = $this->loginSession('escalate@example.com')->accessToken;
 
     $lower = $this->withToken($accessToken)
         ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
@@ -159,20 +124,10 @@ it('refuses to grant a scope the minting token does not hold', function () {
 });
 
 it('revokes a token and answers 404 for another users token', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'revoke@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('revoke@example.com');
+    [, $other] = $this->account('other@example.com');
 
-    $otherWorkspace = Workspace::factory()->create();
-    $other = User::factory()->create(['email' => 'other@example.com']);
-    $otherWorkspace->members()->attach($other->id, ['role' => 'owner']);
-
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'revoke@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
-    $accessToken = $login->json('access_token');
+    $accessToken = $this->loginSession('revoke@example.com')->accessToken;
 
     $created = $this->withToken($accessToken)
         ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
@@ -199,23 +154,15 @@ it('revokes a token and answers 404 for another users token', function () {
     $response = $this->withToken($accessToken)
         ->deleteJson('https://api.url.infinityproject.fr/v1/tokens/'.$foreign->id);
 
-    $response->assertStatus(404);
-    expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($response->json('code'))->toBe('not_found');
+    $this->assertProblem($response, 404, 'not_found');
 });
 
 it('requires the tokens read ability to list tokens', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'noread@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    $this->account('noread@example.com');
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'noread@example.com',
-        'password' => 'password',
-    ]);
-    $login->assertStatus(200);
+    $accessToken = $this->loginSession('noread@example.com')->accessToken;
 
-    $created = $this->withToken($login->json('access_token'))
+    $created = $this->withToken($accessToken)
         ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
             'name' => 'no-token-read',
             'scopes' => ['links:read'],
@@ -227,7 +174,5 @@ it('requires the tokens read ability to list tokens', function () {
     $response = $this->withToken($created->json('token'))
         ->getJson('https://api.url.infinityproject.fr/v1/tokens');
 
-    $response->assertStatus(403);
-    expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($response->json('code'))->toBe('scope_missing');
+    $this->assertProblem($response, 403, 'scope_missing');
 });

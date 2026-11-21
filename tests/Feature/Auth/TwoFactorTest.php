@@ -1,33 +1,19 @@
 <?php
 
-use App\Models\User;
-use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
-use PragmaRX\Google2FA\Google2FA;
 
 it('enables two factor authentication, returns ten recovery codes and reports it on me', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'enable@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('enable@example.com');
 
-    Sanctum::actingAs($user, ['me:write']);
-
-    $enable = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/enable');
-    $enable->assertStatus(200);
-
+    $enable = $this->enableTotp($user);
     $secret = $enable->json('secret');
     $otpauthUrl = $enable->json('otpauth_url');
 
-    expect($secret)->toBeString()->not->toBe('');
     expect($otpauthUrl)->toBeString()->toStartWith('otpauth://');
     expect($otpauthUrl)->toContain('secret='.$secret);
 
-    $confirm = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
-        'code' => (new Google2FA)->getCurrentOtp($secret),
-    ]);
-
-    $confirm->assertStatus(200);
+    $confirm = $this->confirmTotp($secret);
 
     $codes = $confirm->json('recovery_codes');
     expect($codes)->toHaveCount(10);
@@ -46,24 +32,15 @@ it('enables two factor authentication, returns ten recovery codes and reports it
 });
 
 it('refuses to confirm two factor authentication twice', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'confirmtwice@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('confirmtwice@example.com');
 
-    $google2fa = new Google2FA;
-
-    Sanctum::actingAs($user, ['me:write']);
-
-    $enable = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/enable');
-    $enable->assertStatus(200);
+    $enable = $this->enableTotp($user);
     $secret = $enable->json('secret');
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
-        'code' => $google2fa->getCurrentOtp($secret),
-    ])->assertStatus(200);
+    $this->confirmTotp($secret);
 
     $second = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
-        'code' => $google2fa->oathTotp($secret, $google2fa->getTimestamp() + 1),
+        'code' => $this->nextTotpCode($secret),
     ]);
 
     $second->assertStatus(409);
@@ -72,28 +49,14 @@ it('refuses to confirm two factor authentication twice', function () {
 });
 
 it('completes a login with a recovery code once and keeps the other codes usable', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'recovery@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('recovery@example.com');
 
-    $google2fa = new Google2FA;
-
-    Sanctum::actingAs($user, ['me:write']);
-
-    $enable = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/enable');
-    $enable->assertStatus(200);
+    $enable = $this->enableTotp($user);
     $secret = $enable->json('secret');
 
-    $confirm = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
-        'code' => $google2fa->getCurrentOtp($secret),
-    ]);
-    $confirm->assertStatus(200);
-    $codes = $confirm->json('recovery_codes');
+    $codes = $this->confirmTotp($secret)->json('recovery_codes');
 
-    $firstChallenge = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'recovery@example.com',
-        'password' => 'password',
-    ])->json('challenge');
+    $firstChallenge = $this->challenge('recovery@example.com');
 
     $first = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
         'challenge' => $firstChallenge,
@@ -105,10 +68,7 @@ it('completes a login with a recovery code once and keeps the other codes usable
     expect($first->json('user.email'))->toBe('recovery@example.com');
     expect($first->getCookie('__Host-iurl_refresh', false))->not->toBeNull();
 
-    $secondChallenge = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'recovery@example.com',
-        'password' => 'password',
-    ])->json('challenge');
+    $secondChallenge = $this->challenge('recovery@example.com');
 
     $reused = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
         'challenge' => $secondChallenge,
@@ -119,10 +79,7 @@ it('completes a login with a recovery code once and keeps the other codes usable
     expect($reused->json('code'))->toBe('recovery_code_invalid');
     $reused->assertCookieMissing('__Host-iurl_refresh');
 
-    $thirdChallenge = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'recovery@example.com',
-        'password' => 'password',
-    ])->json('challenge');
+    $thirdChallenge = $this->challenge('recovery@example.com');
 
     $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
         'challenge' => $thirdChallenge,
@@ -131,19 +88,13 @@ it('completes a login with a recovery code once and keeps the other codes usable
 });
 
 it('disables two factor authentication with the password and a totp code', function () {
-    $google2fa = new Google2FA;
-    $secret = $google2fa->generateSecretKey();
-
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'disable@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-    $user->forceFill(['totp_secret' => $secret, 'totp_confirmed_at' => now()])->save();
+    [, $user, $secret] = $this->totpAccount('disable@example.com');
 
     Sanctum::actingAs($user, ['me:write']);
 
     $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/disable', [
         'password' => 'password',
-        'code' => $google2fa->getCurrentOtp($secret),
+        'code' => $this->totpCode($secret),
     ]);
 
     $response->assertStatus(204);
@@ -153,57 +104,35 @@ it('disables two factor authentication with the password and a totp code', funct
     expect($fresh->totp_confirmed_at)->toBeNull();
     expect(DB::table('recovery_codes')->where('user_id', $user->id)->count())->toBe(0);
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'disable@example.com',
-        'password' => 'password',
-    ]);
+    $login = $this->login('disable@example.com');
 
-    $login->assertStatus(200);
     expect($login->json('access_token'))->toBeString()->not->toBe('');
     expect($login->json('status'))->toBeNull();
     expect($login->getCookie('__Host-iurl_refresh', false))->not->toBeNull();
 });
 
 it('rejects disabling two factor authentication with a wrong password', function () {
-    $google2fa = new Google2FA;
-    $secret = $google2fa->generateSecretKey();
-
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'wrongpass@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-    $user->forceFill(['totp_secret' => $secret, 'totp_confirmed_at' => now()])->save();
+    [, $user, $secret] = $this->totpAccount('wrongpass@example.com');
 
     Sanctum::actingAs($user, ['me:write']);
 
     $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/disable', [
         'password' => 'not-the-password',
-        'code' => $google2fa->getCurrentOtp($secret),
+        'code' => $this->totpCode($secret),
     ]);
 
-    $response->assertStatus(422);
-    expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-    expect($response->json('code'))->toBe('validation_failed');
+    $this->assertProblem($response, 422, 'validation_failed');
     expect($response->json('errors'))->toHaveKey('password');
     expect($user->fresh()->totp_confirmed_at)->not->toBeNull();
 });
 
 it('regenerates ten recovery codes and invalidates every old one', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'regenerate@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('regenerate@example.com');
 
-    $google2fa = new Google2FA;
-
-    Sanctum::actingAs($user, ['me:write']);
-
-    $enable = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/enable');
-    $enable->assertStatus(200);
+    $enable = $this->enableTotp($user);
     $secret = $enable->json('secret');
 
-    $confirm = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
-        'code' => $google2fa->getCurrentOtp($secret),
-    ]);
-    $confirm->assertStatus(200);
+    $confirm = $this->confirmTotp($secret);
     $oldCodes = $confirm->json('recovery_codes');
     $oldHashes = DB::table('recovery_codes')->where('user_id', $user->id)->pluck('code_hash')->all();
 
@@ -211,7 +140,7 @@ it('regenerates ten recovery codes and invalidates every old one', function () {
     // the accepted window and is not a replay.
     $regenerate = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/recovery-codes', [
         'password' => 'password',
-        'code' => $google2fa->oathTotp($secret, $google2fa->getTimestamp() + 1),
+        'code' => $this->nextTotpCode($secret),
     ]);
 
     $regenerate->assertStatus(200);
@@ -223,10 +152,7 @@ it('regenerates ten recovery codes and invalidates every old one', function () {
     expect(DB::table('recovery_codes')->whereIn('code_hash', $oldHashes)->count())->toBe(0);
 
     foreach (array_slice($oldCodes, 0, 3) as $oldCode) {
-        $challenge = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-            'email' => 'regenerate@example.com',
-            'password' => 'password',
-        ])->json('challenge');
+        $challenge = $this->challenge('regenerate@example.com');
 
         $rejected = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
             'challenge' => $challenge,
@@ -237,10 +163,7 @@ it('regenerates ten recovery codes and invalidates every old one', function () {
         expect($rejected->json('code'))->toBe('recovery_code_invalid');
     }
 
-    $challenge = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'regenerate@example.com',
-        'password' => 'password',
-    ])->json('challenge');
+    $challenge = $this->challenge('regenerate@example.com');
 
     $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
         'challenge' => $challenge,
@@ -249,9 +172,7 @@ it('regenerates ten recovery codes and invalidates every old one', function () {
 });
 
 it('requires the me write ability for every two factor mutation', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create();
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account();
 
     Sanctum::actingAs($user, ['me:read']);
 
@@ -265,9 +186,7 @@ it('requires the me write ability for every two factor mutation', function () {
     foreach ($requests as $url) {
         $response = $this->postJson($url, ['code' => '000000']);
 
-        $response->assertStatus(403);
-        expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
-        expect($response->json('code'))->toBe('scope_missing');
+        $this->assertProblem($response, 403, 'scope_missing');
     }
 
     expect($user->fresh()->totp_confirmed_at)->toBeNull();

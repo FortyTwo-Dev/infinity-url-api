@@ -1,26 +1,16 @@
 <?php
 
-use App\Models\Domain;
 use App\Models\Link;
 use App\Models\User;
 use App\Models\Workspace;
-use Database\Seeders\LinkDomainSeeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 it('deletes the account, soft deletes it and revokes every token', function () {
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'delete@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [, $user] = $this->account('delete@example.com');
 
-    $token = $user->createToken('dashboard', ['*'])->plainTextToken;
-
-    $response = $this->withToken($token)->deleteJson('https://api.url.infinityproject.fr/v1/me', [
-        'password' => 'password',
-    ]);
-
-    $response->assertStatus(204);
+    $token = $this->deleteAccount($user);
 
     $trashed = User::withTrashed()->find($user->id);
     expect($trashed)->not->toBeNull();
@@ -48,34 +38,18 @@ it('keeps the email occupied after a deletion', function () {
 });
 
 it('restores a deleted account and its links when logging in within the grace period', function () {
-    $this->seed(LinkDomainSeeder::class);
-    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
+    $domain = $this->linkDomain();
 
-    $workspace = Workspace::factory()->create(['name' => 'My workspace']);
-    $user = User::factory()->create(['email' => 'restore@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [$workspace, $user] = $this->account('restore@example.com', ['name' => 'My workspace']);
+    $this->linkOn($workspace, $domain, 'keepme1');
 
-    Link::factory()->forDomain($domain)->create([
-        'workspace_id' => $workspace->id,
-        'slug' => 'keepme1',
-    ]);
-
-    $token = $user->createToken('dashboard', ['*'])->plainTextToken;
-
-    $this->withToken($token)->deleteJson('https://api.url.infinityproject.fr/v1/me', [
-        'password' => 'password',
-    ])->assertStatus(204);
+    $this->deleteAccount($user);
 
     $this->flushHeaders();
 
     expect(User::find($user->id))->toBeNull();
 
-    $restored = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'restore@example.com',
-        'password' => 'password',
-    ]);
-
-    $restored->assertStatus(200);
+    $restored = $this->login('restore@example.com');
     expect($restored->json('user.id'))->toBe($user->public_id);
 
     $again = User::find($user->id);
@@ -86,23 +60,12 @@ it('restores a deleted account and its links when logging in within the grace pe
 });
 
 it('refuses the login after the grace period and purges the account with slug tombstones', function () {
-    $this->seed(LinkDomainSeeder::class);
-    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
+    $domain = $this->linkDomain();
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'purged@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
+    [$workspace, $user] = $this->account('purged@example.com');
+    $this->linkOn($workspace, $domain, 'purge001');
 
-    Link::factory()->forDomain($domain)->create([
-        'workspace_id' => $workspace->id,
-        'slug' => 'purge001',
-    ]);
-
-    $token = $user->createToken('dashboard', ['*'])->plainTextToken;
-
-    $this->withToken($token)->deleteJson('https://api.url.infinityproject.fr/v1/me', [
-        'password' => 'password',
-    ])->assertStatus(204);
+    $this->deleteAccount($user);
 
     $this->flushHeaders();
 
@@ -133,26 +96,15 @@ it('refuses the login after the grace period and purges the account with slug to
 });
 
 it('invalidates a warmed redirect cache when the purge runs', function () {
-    $this->seed(LinkDomainSeeder::class);
-    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
+    $domain = $this->linkDomain();
 
-    $workspace = Workspace::factory()->create();
-    $user = User::factory()->create(['email' => 'warmcache@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-
-    Link::factory()->forDomain($domain)->create([
-        'workspace_id' => $workspace->id,
-        'slug' => 'warm001',
-    ]);
+    [$workspace, $user] = $this->account('warmcache@example.com');
+    $this->linkOn($workspace, $domain, 'warm001');
 
     $this->get('https://iurl.fr/warm001')->assertStatus(302);
     expect(Cache::has('link:iurl.fr:warm001'))->toBeTrue();
 
-    $token = $user->createToken('dashboard', ['*'])->plainTextToken;
-
-    $this->withToken($token)->deleteJson('https://api.url.infinityproject.fr/v1/me', [
-        'password' => 'password',
-    ])->assertStatus(204);
+    $this->deleteAccount($user);
 
     $this->flushHeaders();
     $this->app['auth']->forgetGuards();
