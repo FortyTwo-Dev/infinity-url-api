@@ -15,7 +15,7 @@ it('redirects an active link with the privacy headers and no body', function () 
         'destination' => 'https://example.com/page',
     ]);
 
-    $response = $this->get('http://iurl.fr/active1');
+    $response = $this->get('https://iurl.fr/active1');
 
     $response->assertStatus(302);
     $response->assertHeader('Location', 'https://example.com/page');
@@ -28,7 +28,7 @@ it('redirects an active link with the privacy headers and no body', function () 
 it('answers 404 for an unknown slug', function () {
     Domain::factory()->forHost('iurl.fr')->create();
 
-    $response = $this->get('http://iurl.fr/unknown1');
+    $response = $this->get('https://iurl.fr/unknown1');
 
     $response->assertNotFound();
     $response->assertSee('Ce lien n\'existe pas.', false);
@@ -42,7 +42,7 @@ it('answers 410 for an expired link', function () {
         'expires_at' => now()->subMinute(),
     ]);
 
-    $response = $this->get('http://iurl.fr/expired1');
+    $response = $this->get('https://iurl.fr/expired1');
 
     $response->assertStatus(410);
     $response->assertSee('Ce lien a expiré.', false);
@@ -55,7 +55,7 @@ it('answers 410 for a disabled link', function () {
         'status' => LinkStatus::Disabled,
     ]);
 
-    $response = $this->get('http://iurl.fr/disabled1');
+    $response = $this->get('https://iurl.fr/disabled1');
 
     $response->assertStatus(410);
     $response->assertSee('Ce lien a expiré.', false);
@@ -68,7 +68,7 @@ it('answers 403 for a blocked link', function () {
         'status' => LinkStatus::Blocked,
     ]);
 
-    $response = $this->get('http://iurl.fr/blocked1');
+    $response = $this->get('https://iurl.fr/blocked1');
 
     $response->assertStatus(403);
     $response->assertSee('Ce lien a été bloqué pour abus.', false);
@@ -81,7 +81,7 @@ it('answers 410 for a soft-deleted link', function () {
 
     $link->delete();
 
-    $response = $this->get('http://iurl.fr/deleted1');
+    $response = $this->get('https://iurl.fr/deleted1');
 
     $response->assertStatus(410);
     $response->assertSee('Ce lien a été supprimé définitivement.', false);
@@ -96,7 +96,7 @@ it('answers 410 for a slug in the tombstone table', function () {
         'erased_at' => now(),
     ]);
 
-    $response = $this->get('http://iurl.fr/erased1');
+    $response = $this->get('https://iurl.fr/erased1');
 
     $response->assertStatus(410);
     $response->assertSee('Ce lien a été supprimé définitivement.', false);
@@ -114,7 +114,7 @@ it('answers 404 for a link whose domain is pending', function () {
         'destination' => 'https://example.com/pending',
     ]);
 
-    $response = $this->get('http://iurl.fr/pending1');
+    $response = $this->get('https://iurl.fr/pending1');
 
     $response->assertNotFound();
     $response->assertSee('Ce lien n\'existe pas.', false);
@@ -127,7 +127,7 @@ it('treats an uppercase slug like its lowercase form', function () {
         'destination' => 'https://example.com/mixed',
     ]);
 
-    $response = $this->get('http://iurl.fr/MIXEDCASE1');
+    $response = $this->get('https://iurl.fr/MIXEDCASE1');
 
     $response->assertStatus(302);
     $response->assertHeader('Location', 'https://example.com/mixed');
@@ -140,7 +140,7 @@ it('answers HEAD without a body', function () {
         'destination' => 'https://example.com/head',
     ]);
 
-    $response = $this->head('http://iurl.fr/head1');
+    $response = $this->head('https://iurl.fr/head1');
 
     $response->assertStatus(302);
     $response->assertHeader('Location', 'https://example.com/head');
@@ -155,7 +155,7 @@ it('answers 410 when expires_at is exactly now', function () {
         'expires_at' => now(),
     ]);
 
-    $response = $this->get('http://iurl.fr/expiresnow1');
+    $response = $this->get('https://iurl.fr/expiresnow1');
 
     $response->assertStatus(410);
     $response->assertSee('Ce lien a expiré.', false);
@@ -166,8 +166,8 @@ it('enforces the slug length boundaries', function () {
 
     // Length 1 and 65 are rejected by the links_slug_format constraint, so no
     // link can exist for them; they must still answer 404.
-    $this->get('http://iurl.fr/a')->assertNotFound();
-    $this->get('http://iurl.fr/'.str_repeat('b', 65))->assertNotFound();
+    $this->get('https://iurl.fr/a')->assertNotFound();
+    $this->get('https://iurl.fr/'.str_repeat('b', 65))->assertNotFound();
 
     Link::factory()->forDomain($domain)->create([
         'slug' => 'ab',
@@ -178,11 +178,11 @@ it('enforces the slug length boundaries', function () {
         'destination' => 'https://example.com/sixty-four',
     ]);
 
-    $this->get('http://iurl.fr/ab')
+    $this->get('https://iurl.fr/ab')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/two');
 
-    $this->get('http://iurl.fr/'.str_repeat('c', 64))
+    $this->get('https://iurl.fr/'.str_repeat('c', 64))
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/sixty-four');
 });
@@ -204,7 +204,7 @@ it('does not cache a redirect whose ttl rounds down to zero', function () {
             'expires_at' => now()->addMilliseconds(500)->format('Y-m-d H:i:s.uP'),
         ]);
 
-        $response = $this->get('http://iurl.fr/zerottl1');
+        $response = $this->get('https://iurl.fr/zerottl1');
 
         $response->assertStatus(302);
         expect(Cache::has('link:iurl.fr:zerottl1'))->toBeFalse();
@@ -230,7 +230,7 @@ it('never queues analytics or writes to the database during a redirect', functio
         }
     });
 
-    $this->get('http://iurl.fr/readonly1')->assertStatus(302);
+    $this->get('https://iurl.fr/readonly1')->assertStatus(302);
 
     Queue::assertNothingPushed();
     expect($writes)->toBe([]);

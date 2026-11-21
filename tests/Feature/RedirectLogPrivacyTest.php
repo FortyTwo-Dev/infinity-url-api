@@ -46,7 +46,7 @@ it('never logs the visitor user agent, referer or ip address', function () {
             'Referer' => 'https://privacy-probe.example/secret',
         ])->withServerVariables([
             'REMOTE_ADDR' => '203.0.113.42',
-        ])->get('http://iurl.fr/logprobe1');
+        ])->get('https://iurl.fr/logprobe1');
 
         $response->assertStatus(302);
 

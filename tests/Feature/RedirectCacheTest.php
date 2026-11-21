@@ -8,6 +8,8 @@ use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
+const LINKS_TABLE_FRAGMENT = 'from "links"';
+
 function redirectCacheTtl(string $key): int
 {
     $store = Cache::store();
@@ -22,17 +24,17 @@ it('serves a warm redirect without reading the links table', function () {
         'destination' => 'https://example.com/warm',
     ]);
 
-    $this->get('http://iurl.fr/warm1')->assertStatus(302);
+    $this->get('https://iurl.fr/warm1')->assertStatus(302);
 
     $reads = 0;
 
     DB::listen(function ($query) use (&$reads): void {
-        if (str_contains($query->sql, 'from "links"')) {
+        if (str_contains($query->sql, LINKS_TABLE_FRAGMENT)) {
             $reads++;
         }
     });
 
-    $this->get('http://iurl.fr/warm1')
+    $this->get('https://iurl.fr/warm1')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/warm');
 
@@ -42,19 +44,19 @@ it('serves a warm redirect without reading the links table', function () {
 it('serves a negative cache hit without reading the links table', function () {
     Domain::factory()->forHost('iurl.fr')->create();
 
-    $this->get('http://iurl.fr/missing1')->assertNotFound();
+    $this->get('https://iurl.fr/missing1')->assertNotFound();
 
     expect(Cache::has('link:iurl.fr:missing1'))->toBeTrue();
 
     $reads = 0;
 
     DB::listen(function ($query) use (&$reads): void {
-        if (str_contains($query->sql, 'from "links"')) {
+        if (str_contains($query->sql, LINKS_TABLE_FRAGMENT)) {
             $reads++;
         }
     });
 
-    $this->get('http://iurl.fr/missing1')->assertNotFound();
+    $this->get('https://iurl.fr/missing1')->assertNotFound();
 
     expect($reads)->toBe(0);
 });
@@ -67,7 +69,7 @@ it('bounds the redirect cache ttl by the link expiration', function () {
         'expires_at' => now()->addSeconds(2),
     ]);
 
-    $this->get('http://iurl.fr/shortttl1')->assertStatus(302);
+    $this->get('https://iurl.fr/shortttl1')->assertStatus(302);
 
     $key = 'link:iurl.fr:shortttl1';
     $store = Cache::store();
@@ -86,7 +88,7 @@ it('never caches a redirect for an already expired link', function () {
         'expires_at' => now()->subMinute(),
     ]);
 
-    $this->get('http://iurl.fr/expiredcache1')->assertStatus(410);
+    $this->get('https://iurl.fr/expiredcache1')->assertStatus(410);
 
     $cached = Cache::get('link:iurl.fr:expiredcache1');
 
@@ -96,25 +98,26 @@ it('never caches a redirect for an already expired link', function () {
 it('forgets a redirect cache entry explicitly', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     $slug = 'forget1';
+    $destination = 'https://example.com/forget';
 
     Link::factory()->forDomain($domain)->create([
         'slug' => $slug,
-        'destination' => 'https://example.com/forget',
+        'destination' => $destination,
     ]);
 
-    $this->get("http://iurl.fr/{$slug}")->assertStatus(302);
+    $this->get("https://iurl.fr/{$slug}")->assertStatus(302);
 
     $reads = 0;
 
     DB::listen(function ($query) use (&$reads): void {
-        if (str_contains($query->sql, 'from "links"')) {
+        if (str_contains($query->sql, LINKS_TABLE_FRAGMENT)) {
             $reads++;
         }
     });
 
-    $this->get("http://iurl.fr/{$slug}")
+    $this->get("https://iurl.fr/{$slug}")
         ->assertStatus(302)
-        ->assertHeader('Location', 'https://example.com/forget');
+        ->assertHeader('Location', $destination);
 
     expect($reads)->toBe(0);
 
@@ -122,9 +125,9 @@ it('forgets a redirect cache entry explicitly', function () {
 
     $reads = 0;
 
-    $this->get("http://iurl.fr/{$slug}")
+    $this->get("https://iurl.fr/{$slug}")
         ->assertStatus(302)
-        ->assertHeader('Location', 'https://example.com/forget');
+        ->assertHeader('Location', $destination);
 
     expect($reads)->toBe(1);
 });
@@ -134,7 +137,7 @@ it('caches a negative hit for at most sixty seconds', function () {
 
     $slug = 'ttlmissing1';
 
-    $this->get("http://iurl.fr/{$slug}")->assertNotFound();
+    $this->get("https://iurl.fr/{$slug}")->assertNotFound();
 
     $ttl = redirectCacheTtl("link:iurl.fr:{$slug}");
 
@@ -155,8 +158,8 @@ it('caches transient error states for at most sixty seconds', function () {
         'expires_at' => now()->subMinute(),
     ]);
 
-    $this->get('http://iurl.fr/ttlblocked1')->assertStatus(403);
-    $this->get('http://iurl.fr/ttlexpired1')->assertStatus(410);
+    $this->get('https://iurl.fr/ttlblocked1')->assertStatus(403);
+    $this->get('https://iurl.fr/ttlexpired1')->assertStatus(410);
 
     $blockedTtl = redirectCacheTtl('link:iurl.fr:ttlblocked1');
     $expiredTtl = redirectCacheTtl('link:iurl.fr:ttlexpired1');
@@ -179,8 +182,8 @@ it('caches deleted and tombstoned slugs for a day', function () {
         'erased_at' => now(),
     ]);
 
-    $this->get('http://iurl.fr/ttldeleted1')->assertStatus(410);
-    $this->get('http://iurl.fr/ttlerased1')->assertStatus(410);
+    $this->get('https://iurl.fr/ttldeleted1')->assertStatus(410);
+    $this->get('https://iurl.fr/ttlerased1')->assertStatus(410);
 
     $deletedTtl = redirectCacheTtl('link:iurl.fr:ttldeleted1');
     $erasedTtl = redirectCacheTtl('link:iurl.fr:ttlerased1');
@@ -209,7 +212,7 @@ it('replaces a malformed cache value from postgres', function (array $cached): v
     $key = 'link:iurl.fr:malformed1';
     Cache::put($key, $cached, 60);
 
-    $this->get('http://iurl.fr/malformed1')
+    $this->get('https://iurl.fr/malformed1')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/malformed');
 
@@ -226,21 +229,21 @@ it('invalidates the cache when a link destination is updated', function () {
         'destination' => 'https://example.com/old',
     ]);
 
-    $this->get('http://iurl.fr/mutdest1')
+    $this->get('https://iurl.fr/mutdest1')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/old');
 
     $reads = 0;
 
     DB::listen(function ($query) use (&$reads): void {
-        if (str_contains($query->sql, 'from "links"')) {
+        if (str_contains($query->sql, LINKS_TABLE_FRAGMENT)) {
             $reads++;
         }
     });
 
     $link->update(['destination' => 'https://example.com/new']);
 
-    $this->get('http://iurl.fr/mutdest1')
+    $this->get('https://iurl.fr/mutdest1')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/new');
 
@@ -251,11 +254,11 @@ it('invalidates the cache when a link is blocked', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     $link = Link::factory()->forDomain($domain)->create(['slug' => 'mutblocked1']);
 
-    $this->get('http://iurl.fr/mutblocked1')->assertStatus(302);
+    $this->get('https://iurl.fr/mutblocked1')->assertStatus(302);
 
     $link->update(['status' => LinkStatus::Blocked]);
 
-    $response = $this->get('http://iurl.fr/mutblocked1');
+    $response = $this->get('https://iurl.fr/mutblocked1');
 
     $response->assertStatus(403);
     $response->assertSee('Ce lien a été bloqué pour abus.', false);
@@ -265,11 +268,11 @@ it('invalidates the cache when a link is soft deleted', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     $link = Link::factory()->forDomain($domain)->create(['slug' => 'mutdeleted1']);
 
-    $this->get('http://iurl.fr/mutdeleted1')->assertStatus(302);
+    $this->get('https://iurl.fr/mutdeleted1')->assertStatus(302);
 
     $link->delete();
 
-    $response = $this->get('http://iurl.fr/mutdeleted1');
+    $response = $this->get('https://iurl.fr/mutdeleted1');
 
     $response->assertStatus(410);
     $response->assertSee('Ce lien a été supprimé définitivement.', false);
@@ -284,15 +287,15 @@ it('invalidates both slugs when a link is renamed', function () {
 
     Cache::put('link:iurl.fr:newname1', ['status' => 404], 60);
 
-    $this->get('http://iurl.fr/oldname1')->assertStatus(302);
+    $this->get('https://iurl.fr/oldname1')->assertStatus(302);
 
     $link->update(['slug' => 'newname1']);
 
-    $this->get('http://iurl.fr/oldname1')
+    $this->get('https://iurl.fr/oldname1')
         ->assertNotFound()
         ->assertSee('Ce lien n\'existe pas.', false);
 
-    $this->get('http://iurl.fr/newname1')
+    $this->get('https://iurl.fr/newname1')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/renamed');
 });
@@ -301,14 +304,14 @@ it('invalidates the negative cache when a link is created', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     $slug = 'created1';
 
-    $this->get("http://iurl.fr/{$slug}")->assertNotFound();
+    $this->get("https://iurl.fr/{$slug}")->assertNotFound();
 
     Link::factory()->forDomain($domain)->create([
         'slug' => $slug,
         'destination' => 'https://example.com/created',
     ]);
 
-    $this->get("http://iurl.fr/{$slug}")
+    $this->get("https://iurl.fr/{$slug}")
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/created');
 });
@@ -342,12 +345,12 @@ it('falls back to postgres when valkey is unavailable', function () {
     $reads = 0;
 
     DB::listen(function ($query) use (&$reads): void {
-        if (str_contains($query->sql, 'from "links"')) {
+        if (str_contains($query->sql, LINKS_TABLE_FRAGMENT)) {
             $reads++;
         }
     });
 
-    $this->get('http://iurl.fr/fallback1')
+    $this->get('https://iurl.fr/fallback1')
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/fallback');
 

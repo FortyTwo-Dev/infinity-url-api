@@ -11,7 +11,7 @@ it('serves a bodyless and cookieless redirect', function () {
         'destination' => 'https://example.com/private',
     ]);
 
-    $response = $this->get('http://iurl.fr/private1');
+    $response = $this->get('https://iurl.fr/private1');
     $body = (string) $response->getContent();
 
     $response->assertStatus(302);
@@ -36,9 +36,9 @@ it('sets no cookie on the error pages', function () {
     ]);
 
     $responses = [
-        404 => $this->get('http://iurl.fr/unknown-private'),
-        410 => $this->get('http://iurl.fr/expired-private'),
-        403 => $this->get('http://iurl.fr/blocked-private'),
+        404 => $this->get('https://iurl.fr/unknown-private'),
+        410 => $this->get('https://iurl.fr/expired-private'),
+        403 => $this->get('https://iurl.fr/blocked-private'),
     ];
 
     foreach ($responses as $status => $response) {

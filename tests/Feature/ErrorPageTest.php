@@ -20,7 +20,7 @@ function assertIurlErrorPageShape(TestResponse $response, string $text): void
 it('serves a 404 page that points to the home site', function () {
     Domain::factory()->forHost('iurl.fr')->create();
 
-    $response = $this->get('http://iurl.fr/not-found-page');
+    $response = $this->get('https://iurl.fr/not-found-page');
 
     $response->assertStatus(404);
     assertIurlErrorPageShape($response, 'Ce lien n\'existe pas.');
@@ -33,7 +33,7 @@ it('serves a 410 page for a deleted link', function () {
 
     $link->delete();
 
-    $response = $this->get('http://iurl.fr/deleted-page');
+    $response = $this->get('https://iurl.fr/deleted-page');
 
     $response->assertStatus(410);
     assertIurlErrorPageShape($response, 'Ce lien a été supprimé définitivement.');
@@ -47,7 +47,7 @@ it('serves a 410 page for an expired link', function () {
         'expires_at' => now()->subMinute(),
     ]);
 
-    $response = $this->get('http://iurl.fr/expired-page');
+    $response = $this->get('https://iurl.fr/expired-page');
 
     $response->assertStatus(410);
     assertIurlErrorPageShape($response, 'Ce lien a expiré.');
@@ -60,7 +60,7 @@ it('serves a 403 page for a blocked link', function () {
         'status' => LinkStatus::Blocked,
     ]);
 
-    $response = $this->get('http://iurl.fr/blocked-page');
+    $response = $this->get('https://iurl.fr/blocked-page');
 
     $response->assertStatus(403);
     assertIurlErrorPageShape($response, 'Ce lien a été bloqué pour abus.');

@@ -29,7 +29,7 @@ function assertIurlErrorPageIsStatic(TestResponse $response): void
 it('serves a static 404 page', function () {
     Domain::factory()->forHost('iurl.fr')->create();
 
-    $response = $this->get('http://iurl.fr/unknown-static');
+    $response = $this->get('https://iurl.fr/unknown-static');
 
     $response->assertStatus(404);
     assertIurlErrorPageIsStatic($response);
@@ -41,7 +41,7 @@ it('serves a static 410 page for a deleted link', function () {
 
     $link->delete();
 
-    $response = $this->get('http://iurl.fr/deleted-static');
+    $response = $this->get('https://iurl.fr/deleted-static');
 
     $response->assertStatus(410);
     assertIurlErrorPageIsStatic($response);
@@ -55,7 +55,7 @@ it('serves a static 410 page for an expired link', function () {
         'expires_at' => now()->subMinute(),
     ]);
 
-    $response = $this->get('http://iurl.fr/expired-static');
+    $response = $this->get('https://iurl.fr/expired-static');
 
     $response->assertStatus(410);
     assertIurlErrorPageIsStatic($response);
@@ -68,7 +68,7 @@ it('serves a static 403 page for a blocked link', function () {
         'status' => LinkStatus::Blocked,
     ]);
 
-    $response = $this->get('http://iurl.fr/blocked-static');
+    $response = $this->get('https://iurl.fr/blocked-static');
 
     $response->assertStatus(403);
     assertIurlErrorPageIsStatic($response);

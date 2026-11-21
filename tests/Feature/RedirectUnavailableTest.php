@@ -34,7 +34,7 @@ it('answers 503 with an empty body when postgres is cold and unavailable', funct
     DB::setDefaultConnection('dead');
 
     try {
-        $response = $this->get('http://iurl.fr/dbdown1');
+        $response = $this->get('https://iurl.fr/dbdown1');
     } finally {
         DB::setDefaultConnection($original);
         DB::purge('dead');
@@ -51,7 +51,7 @@ it('serves a cached redirect when postgres becomes unavailable', function () {
         'destination' => 'https://example.com/dbdownwarm',
     ]);
 
-    $this->get('http://iurl.fr/dbdown2')->assertStatus(302);
+    $this->get('https://iurl.fr/dbdown2')->assertStatus(302);
 
     $original = DB::getDefaultConnection();
     config(['database.connections.dead' => deadPostgresConnection()]);
@@ -59,7 +59,7 @@ it('serves a cached redirect when postgres becomes unavailable', function () {
     DB::setDefaultConnection('dead');
 
     try {
-        $response = $this->get('http://iurl.fr/dbdown2');
+        $response = $this->get('https://iurl.fr/dbdown2');
     } finally {
         DB::setDefaultConnection($original);
         DB::purge('dead');

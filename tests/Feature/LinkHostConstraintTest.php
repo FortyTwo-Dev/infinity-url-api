@@ -19,28 +19,28 @@ beforeEach(function () {
 });
 
 it('rejects every non-link path on the link host', function () {
-    $this->get('http://iurl.fr/docs/api')->assertNotFound();
-    $this->get('http://iurl.fr/horizon')->assertNotFound();
-    $this->get('http://iurl.fr/_scramble/dev-tools/devtools.js')->assertNotFound();
-    $this->get('http://iurl.fr/up')->assertNotFound();
-    $this->get('http://iurl.fr/api/user')->assertNotFound();
-    $this->get('http://iurl.fr/')->assertNotFound();
-    $this->post('http://iurl.fr/_boost/browser-logs', [])->assertNotFound();
+    $this->get('https://iurl.fr/docs/api')->assertNotFound();
+    $this->get('https://iurl.fr/horizon')->assertNotFound();
+    $this->get('https://iurl.fr/_scramble/dev-tools/devtools.js')->assertNotFound();
+    $this->get('https://iurl.fr/up')->assertNotFound();
+    $this->get('https://iurl.fr/api/user')->assertNotFound();
+    $this->get('https://iurl.fr/')->assertNotFound();
+    $this->post('https://iurl.fr/_boost/browser-logs', [])->assertNotFound();
 });
 
 it('serves the application routes on the api host', function () {
-    $this->get('http://api.url.infinityproject.fr/docs/api')->assertOk();
-    $this->get('http://api.url.infinityproject.fr/up')->assertOk();
+    $this->get('https://api.url.infinityproject.fr/docs/api')->assertOk();
+    $this->get('https://api.url.infinityproject.fr/up')->assertOk();
 
-    expect($this->get('http://api.url.infinityproject.fr/horizon')->getStatusCode())->not->toBe(404);
-    expect($this->get('http://api.url.infinityproject.fr/_scramble/dev-tools/devtools.js')->getStatusCode())->not->toBe(404);
-    expect($this->post('http://api.url.infinityproject.fr/_boost/browser-logs', [])->getStatusCode())->not->toBe(404);
+    expect($this->get('https://api.url.infinityproject.fr/horizon')->getStatusCode())->not->toBe(404);
+    expect($this->get('https://api.url.infinityproject.fr/_scramble/dev-tools/devtools.js')->getStatusCode())->not->toBe(404);
+    expect($this->post('https://api.url.infinityproject.fr/_boost/browser-logs', [])->getStatusCode())->not->toBe(404);
 
-    $this->get('http://api.url.infinityproject.fr/api/user')->assertNotFound();
+    $this->get('https://api.url.infinityproject.fr/api/user')->assertNotFound();
 });
 
 it('does not serve redirects on the api host', function () {
-    $this->get('http://api.url.infinityproject.fr/un-slug')->assertNotFound();
+    $this->get('https://api.url.infinityproject.fr/un-slug')->assertNotFound();
 });
 
 it('accepts only GET and HEAD on the link host', function () {
@@ -50,8 +50,8 @@ it('accepts only GET and HEAD on the link host', function () {
         'destination' => 'https://example.com/active',
     ]);
 
-    $this->post('http://iurl.fr/active2')->assertNotFound();
-    $this->head('http://iurl.fr/active2')->assertStatus(302);
+    $this->post('https://iurl.fr/active2')->assertNotFound();
+    $this->head('https://iurl.fr/active2')->assertStatus(302);
 });
 
 it('rejects a single trailing slash on a known slug', function () {
@@ -62,7 +62,7 @@ it('rejects a single trailing slash on a known slug', function () {
     ]);
 
     $kernel = $this->app->make(Kernel::class);
-    $request = Request::create('http://iurl.fr/trailing1/');
+    $request = Request::create('https://iurl.fr/trailing1/');
     $response = $kernel->handle($request);
 
     expect($response->getStatusCode())->toBe(404);
@@ -76,7 +76,7 @@ it('rejects a double trailing slash on a known slug', function () {
     ]);
 
     $kernel = $this->app->make(Kernel::class);
-    $request = Request::create('http://iurl.fr/trailing2//');
+    $request = Request::create('https://iurl.fr/trailing2//');
     $response = $kernel->handle($request);
 
     expect($response->getStatusCode())->toBe(404);
@@ -92,10 +92,10 @@ it('never sets a cookie on the link host', function () {
     $paths = ['/', '/active3', '/un-slug', '/docs/api', '/horizon', '/api/user', '/up'];
 
     foreach ($paths as $path) {
-        $response = $this->get('http://iurl.fr'.$path);
+        $response = $this->get('https://iurl.fr'.$path);
 
         expect($response->headers->getCookies())->toBe([]);
     }
 
-    expect($this->post('http://iurl.fr/_boost/browser-logs', [])->headers->getCookies())->toBe([]);
+    expect($this->post('https://iurl.fr/_boost/browser-logs', [])->headers->getCookies())->toBe([]);
 });

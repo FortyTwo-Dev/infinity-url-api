@@ -36,7 +36,7 @@ it('performs a single links read for one hundred concurrent cold requests', func
             }
         });
 
-        $request = Request::create("http://iurl.fr/{$slug}");
+        $request = Request::create("https://iurl.fr/{$slug}");
         $response = $kernel->handle($request);
         $kernel->terminate($request, $response);
 
