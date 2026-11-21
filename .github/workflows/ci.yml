@@ -42,8 +42,6 @@ jobs:
           --health-retries 10
 
     steps:
-      # Les actions sont épinglées par commit, pas par tag : un tag est
-      # mutable et peut être déplacé vers un autre code.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - uses: shivammathur/setup-php@4424c9aab975b57bd706ee5a39c6b4334d6e4f60 # 2.40.0
@@ -79,6 +77,4 @@ jobs:
         run: composer audit
 
       - name: License policy
-        # AGPL-3.0-only ne peut pas absorber une dépendance GPL-2.0-only seule ;
-        # une dépendance multi-licenciée reste acceptable si une option l'est.
         run: php scripts/check-licenses.php

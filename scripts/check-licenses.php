@@ -3,15 +3,14 @@
 declare(strict_types=1);
 
 /**
- * Vérifie qu'aucune dépendance n'impose une licence incompatible avec
- * l'AGPL-3.0-only du projet.
+ * Fails when a dependency forces a licence that AGPL-3.0-only cannot absorb.
  *
- * Une dépendance multi-licenciée est acceptée si **au moins une** de ses
- * licences est compatible : c'est le cas de `nette/schema` et `nette/utils`,
- * proposés en BSD-3-Clause, GPL-2.0-only ou GPL-3.0-only.
+ * A multi-licensed dependency is accepted when at least one of its licences is
+ * compatible: `nette/schema` and `nette/utils` ship as BSD-3-Clause,
+ * GPL-2.0-only or GPL-3.0-only, and picking BSD is fine.
  *
- * Usage : php scripts/check-licenses.php
- * Sortie : 0 si tout est compatible, 1 sinon.
+ * Usage: php scripts/check-licenses.php
+ * Exit: 0 when every dependency is compatible, 1 otherwise.
  */
 const COMPATIBLE = [
     'MIT',
@@ -35,7 +34,7 @@ const COMPATIBLE = [
 $json = shell_exec('composer licenses --format=json 2>/dev/null');
 
 if (! is_string($json) || $json === '') {
-    fwrite(STDERR, "Impossible de lire la sortie de `composer licenses`.\n");
+    fwrite(STDERR, "Cannot read the output of `composer licenses`.\n");
     exit(2);
 }
 
@@ -48,7 +47,7 @@ foreach ($data['dependencies'] ?? [] as $name => $dependency) {
     $licenses = $dependency['license'] ?? [];
 
     if ($licenses === []) {
-        $incompatible[$name] = ['(non déclarée)'];
+        $incompatible[$name] = ['(undeclared)'];
 
         continue;
     }
@@ -59,11 +58,11 @@ foreach ($data['dependencies'] ?? [] as $name => $dependency) {
 }
 
 if ($incompatible === []) {
-    echo "Licences : toutes les dépendances sont compatibles avec AGPL-3.0-only.\n";
+    echo "Licences: every dependency is compatible with AGPL-3.0-only.\n";
     exit(0);
 }
 
-fwrite(STDERR, "Dépendances incompatibles avec AGPL-3.0-only :\n");
+fwrite(STDERR, "Dependencies incompatible with AGPL-3.0-only:\n");
 
 foreach ($incompatible as $name => $licenses) {
     fwrite(STDERR, sprintf("  - %s (%s)\n", $name, implode(', ', $licenses)));

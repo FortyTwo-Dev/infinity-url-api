@@ -7,6 +7,4 @@ parameters:
         - app/
         - routes/
         - database/
-    # Les règles métier vivent dans app/Actions et app/Services : on veut le
-    # niveau 6 partout, pas seulement sur les contrôleurs.
     treatPhpDocTypesAsCertain: false

@@ -42,6 +42,17 @@ updates:
       - dependencies
       - ci
 
-# L'écosystème `docker` sera ajouté avec le premier Containerfile : Dependabot
-# ne lit pas les images déclarées dans compose.yml, il ne scanne que les
-# Dockerfile.
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    labels:
+      - dependencies
+      - containers

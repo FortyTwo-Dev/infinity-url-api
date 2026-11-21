@@ -1,18 +1,18 @@
-# Développement local. En production, Traefik et les limites de ressources
-# sont décrits dans docs/08-setup.md.
+# Local development. Production, Traefik and resource limits are described in
+# docs/08-setup.md.
 #
-# Podman rootless :
+# Rootless Podman:
 #   systemctl --user enable --now podman.socket
 #   export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
 #   podman compose up -d
 #
-# Docker : docker compose up -d
+# Docker: docker compose up -d
 
 name: infinity-url
 
 services:
   postgres:
-    image: docker.io/library/postgres:17-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: infinity_url
       POSTGRES_USER: infinity_url
@@ -28,7 +28,8 @@ services:
       retries: 10
 
   valkey:
-    image: docker.io/valkey/valkey:8-alpine
+    image: valkey/valkey:8-alpine
+    # Cache only: no persistence, so no personal data reaches the disk.
     command: ["valkey-server", "--save", "", "--appendonly", "no"]
     ports:
       - "127.0.0.1:6379:6379"
@@ -39,7 +40,7 @@ services:
       retries: 10
 
   mailpit:
-    image: docker.io/axllent/mailpit:latest
+    image: axllent/mailpit:v1.34
     ports:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
