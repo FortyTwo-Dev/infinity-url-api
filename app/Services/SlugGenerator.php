@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\SlugGenerationFailedException;
 use App\Models\Domain;
 use App\Models\Link;
 use Closure;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 final class SlugGenerator
 {
@@ -35,7 +35,7 @@ final class SlugGenerator
             }
         }
 
-        throw new RuntimeException('Unable to generate a free slug.');
+        throw new SlugGenerationFailedException;
     }
 
     private function candidate(): string

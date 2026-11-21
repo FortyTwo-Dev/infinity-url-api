@@ -35,6 +35,19 @@ final class CreateLink
             throw ProblemException::emailUnverified();
         }
 
+        $domain = $this->domain();
+        $customSlug = $this->customSlug($data);
+        $expiresAt = $this->expiresAt($data);
+
+        if ($customSlug !== null) {
+            $this->slugRules->assertAvailable($domain, $customSlug);
+        }
+
+        return $this->attempt($workspace, $domain, $customSlug, $data, $user, $expiresAt);
+    }
+
+    private function domain(): Domain
+    {
         $domain = Domain::query()
             ->where('hostname', (string) config('redirect.host'))
             ->where('status', DomainStatus::Active)
@@ -45,40 +58,49 @@ final class CreateLink
             throw ProblemException::serviceUnavailable();
         }
 
-        $custom = isset($data['slug']) && is_string($data['slug']) && $data['slug'] !== '';
-        $customSlug = $custom ? SlugRules::normalize((string) $data['slug']) : null;
-        $expiresAt = isset($data['expires_at'])
-            ? CarbonImmutable::parse((string) $data['expires_at'])->utc()
-            : null;
+        return $domain;
+    }
 
-        if ($customSlug !== null) {
-            $this->slugRules->assertAvailable($domain, $customSlug);
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function customSlug(array $data): ?string
+    {
+        if (! isset($data['slug']) || ! is_string($data['slug']) || $data['slug'] === '') {
+            return null;
         }
 
+        return SlugRules::normalize($data['slug']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function expiresAt(array $data): ?CarbonImmutable
+    {
+        return isset($data['expires_at'])
+            ? CarbonImmutable::parse((string) $data['expires_at'])->utc()
+            : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function attempt(
+        Workspace $workspace,
+        Domain $domain,
+        ?string $customSlug,
+        array $data,
+        User $user,
+        ?CarbonImmutable $expiresAt,
+    ): Link {
         $attempts = $customSlug === null ? 5 : 1;
 
         for ($attempt = 0; $attempt < $attempts; $attempt++) {
             $slug = $customSlug ?? $this->slugGenerator->generate($domain);
 
             try {
-                return DB::transaction(function () use ($workspace, $domain, $slug, $data, $user, $expiresAt): Link {
-                    $locked = Workspace::query()
-                        ->whereKey($workspace->id)
-                        ->lockForUpdate()
-                        ->firstOrFail();
-
-                    $this->quota->assertRoom($locked);
-
-                    return Link::query()->create([
-                        'workspace_id' => $locked->id,
-                        'domain_id' => $domain->id,
-                        'slug' => $slug,
-                        'destination' => $data['destination'],
-                        'status' => LinkStatus::Active,
-                        'expires_at' => $expiresAt,
-                        'created_by' => $user->id,
-                    ]);
-                });
+                return $this->create($workspace, $domain, $slug, $data, $user, $expiresAt);
             } catch (QueryException $exception) {
                 if (! $this->isDuplicate($exception)) {
                     throw $exception;
@@ -91,6 +113,37 @@ final class CreateLink
         }
 
         throw ProblemException::serviceUnavailable();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function create(
+        Workspace $workspace,
+        Domain $domain,
+        string $slug,
+        array $data,
+        User $user,
+        ?CarbonImmutable $expiresAt,
+    ): Link {
+        return DB::transaction(function () use ($workspace, $domain, $slug, $data, $user, $expiresAt): Link {
+            $locked = Workspace::query()
+                ->whereKey($workspace->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->quota->assertRoom($locked);
+
+            return Link::query()->create([
+                'workspace_id' => $locked->id,
+                'domain_id' => $domain->id,
+                'slug' => $slug,
+                'destination' => $data['destination'],
+                'status' => LinkStatus::Active,
+                'expires_at' => $expiresAt,
+                'created_by' => $user->id,
+            ]);
+        });
     }
 
     private function isDuplicate(QueryException $exception): bool

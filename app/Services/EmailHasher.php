@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use RuntimeException;
+use App\Exceptions\BlindIndexKeyMissingException;
 
 final class EmailHasher
 {
@@ -18,7 +18,7 @@ final class EmailHasher
         $key = config('identity.blind_index_key');
 
         if (! is_string($key) || $key === '') {
-            throw new RuntimeException('BLIND_INDEX_KEY is not configured.');
+            throw new BlindIndexKeyMissingException;
         }
 
         return hash_hmac('sha256', self::normalize($email), $key);

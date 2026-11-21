@@ -19,6 +19,8 @@ use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
+$linkUri = 'links/{id}';
+
 Route::prefix('auth')->group(function (): void {
     Route::post('register', RegisterController::class)->middleware('throttle:register');
     Route::post('verify-email', VerifyEmailController::class);
@@ -33,7 +35,7 @@ Route::prefix('auth')->group(function (): void {
     Route::post('password/reset', ResetPasswordController::class);
 });
 
-Route::middleware('auth:sanctum')->group(function (): void {
+Route::middleware('auth:sanctum')->group(function () use ($linkUri): void {
     Route::get('me', [MeController::class, 'show'])->middleware('abilities:me:read');
     Route::get('me/export', [MeController::class, 'export'])->middleware('abilities:me:read');
     Route::patch('me/password', [MeController::class, 'password'])->middleware('abilities:me:write');
@@ -53,9 +55,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('links', [LinkController::class, 'index'])->middleware('abilities:links:read');
     Route::post('links', [LinkController::class, 'store'])
         ->middleware(['abilities:links:write', 'throttle:link-create']);
-    Route::get('links/{id}', [LinkController::class, 'show'])->middleware('abilities:links:read');
-    Route::patch('links/{id}', [LinkController::class, 'update'])->middleware('abilities:links:write');
-    Route::delete('links/{id}', [LinkController::class, 'destroy'])->middleware('abilities:links:write');
+    Route::get($linkUri, [LinkController::class, 'show'])->middleware('abilities:links:read');
+    Route::patch($linkUri, [LinkController::class, 'update'])->middleware('abilities:links:write');
+    Route::delete($linkUri, [LinkController::class, 'destroy'])->middleware('abilities:links:write');
 
     Route::get('tokens', [TokenController::class, 'index'])->middleware('abilities:tokens:read');
     Route::post('tokens', [TokenController::class, 'store'])

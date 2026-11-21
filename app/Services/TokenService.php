@@ -33,6 +33,18 @@ final class TokenService
 
     public function rotate(string $plainToken): SessionTokens
     {
+        $found = $this->refreshToken($plainToken);
+        $tokens = $this->transaction($found);
+
+        if (! $tokens instanceof SessionTokens) {
+            throw ProblemException::tokenRevoked();
+        }
+
+        return $tokens;
+    }
+
+    private function refreshToken(string $plainToken): PersonalAccessToken
+    {
         $found = PersonalAccessToken::findToken($plainToken);
 
         if (! $found instanceof PersonalAccessToken
@@ -42,58 +54,13 @@ final class TokenService
             throw ProblemException::tokenRevoked();
         }
 
-        $tokenId = $found->id;
-        $familyId = $found->family_id;
-        $tokens = null;
+        return $found;
+    }
 
+    private function transaction(PersonalAccessToken $found): ?SessionTokens
+    {
         try {
-            $tokens = DB::transaction(function () use ($tokenId, $familyId): ?SessionTokens {
-                // Serialise the whole family before locking a token row: two
-                // replays of different tokens from one family would otherwise
-                // each lock their row and deadlock in revokeFamily(). The lock
-                // is transaction-scoped and released on commit or rollback.
-                DB::select('select pg_advisory_xact_lock(hashtext(?)::bigint)', [$familyId]);
-
-                $token = PersonalAccessToken::query()
-                    ->whereKey($tokenId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $token instanceof PersonalAccessToken
-                    || $token->type !== 'refresh'
-                    || ! $token->can('refresh')) {
-                    throw ProblemException::tokenRevoked();
-                }
-
-                if ($token->consumed_at !== null) {
-                    $this->revokeFamily($token->family_id);
-
-                    return null;
-                }
-
-                if ($token->expires_at !== null && $token->expires_at->isPast()) {
-                    $this->revokeFamily($token->family_id);
-
-                    return null;
-                }
-
-                $user = $token->tokenable;
-
-                if (! $user instanceof User || $user->trashed()) {
-                    throw ProblemException::tokenRevoked();
-                }
-
-                $token->forceFill(['consumed_at' => now()])->save();
-                $access = $this->createAccess($user);
-                $refresh = $this->createRefresh($user, $familyId);
-
-                return new SessionTokens(
-                    $access->plainTextToken,
-                    $refresh->plainTextToken,
-                    $familyId,
-                    $this->accessTtlSeconds(),
-                );
-            });
+            return DB::transaction(fn () => $this->rotateLocked($found));
         } catch (Throwable $exception) {
             if ($exception instanceof ProblemException) {
                 throw $exception;
@@ -101,12 +68,85 @@ final class TokenService
 
             throw ProblemException::serviceUnavailable();
         }
+    }
 
-        if (! $tokens instanceof SessionTokens) {
+    private function rotateLocked(PersonalAccessToken $found): ?SessionTokens
+    {
+        // Serialise the whole family before locking a token row: two replays
+        // of different tokens from one family would otherwise each lock their
+        // row and deadlock in revokeFamily(). The lock is transaction-scoped.
+        DB::select('select pg_advisory_xact_lock(hashtext(?)::bigint)', [$found->family_id]);
+
+        $token = $this->assertRotatable($this->lock($found));
+
+        if ($this->isReplay($token)) {
+            return null;
+        }
+
+        $user = $this->user($token);
+        $token->forceFill(['consumed_at' => now()])->save();
+
+        return $this->issue($user, (string) $token->family_id);
+    }
+
+    private function lock(PersonalAccessToken $found): ?PersonalAccessToken
+    {
+        return PersonalAccessToken::query()
+            ->whereKey($found->id)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function assertRotatable(?PersonalAccessToken $token): PersonalAccessToken
+    {
+        if (! $token instanceof PersonalAccessToken
+            || $token->type !== 'refresh'
+            || ! $token->can('refresh')) {
             throw ProblemException::tokenRevoked();
         }
 
-        return $tokens;
+        return $token;
+    }
+
+    private function isReplay(PersonalAccessToken $token): bool
+    {
+        if ($token->consumed_at !== null) {
+            $this->revokeFamily($token->family_id);
+
+            return true;
+        }
+
+        if ($token->expires_at !== null && $token->expires_at->isPast()) {
+            $this->revokeFamily($token->family_id);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function user(PersonalAccessToken $token): User
+    {
+        $user = $token->tokenable;
+
+        if (! $user instanceof User || $user->trashed()) {
+            throw ProblemException::tokenRevoked();
+        }
+
+        return $user;
+    }
+
+    private function issue(User $user, string $familyId): SessionTokens
+    {
+        $access = $this->createAccess($user);
+        $refresh = $this->createRefresh($user, $familyId);
+
+        return new SessionTokens(
+            $access->plainTextToken,
+            $refresh->plainTextToken,
+            $familyId,
+            $this->accessTtlSeconds(),
+        );
     }
 
     public function familyFor(string $plainToken): ?string

@@ -22,6 +22,20 @@ final class SignedPayload
 
     public function resolve(string $token, string $purpose): ?string
     {
+        $payload = $this->payload($token);
+
+        if ($payload === null || ! $this->matches($payload, $purpose)) {
+            return null;
+        }
+
+        return (string) $payload['sub'];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function payload(string $token): ?array
+    {
         $decoded = base64_decode($token, true);
 
         if ($decoded === false || base64_encode($decoded) !== $token) {
@@ -34,14 +48,17 @@ final class SignedPayload
             return null;
         }
 
-        if (! is_array($payload)
-            || ($payload['purpose'] ?? null) !== $purpose
-            || ! is_string($payload['sub'] ?? null)
-            || ! is_int($payload['exp'] ?? null)
-            || $payload['exp'] < now()->getTimestamp()) {
-            return null;
-        }
+        return is_array($payload) ? $payload : null;
+    }
 
-        return $payload['sub'];
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function matches(array $payload, string $purpose): bool
+    {
+        return ($payload['purpose'] ?? null) === $purpose
+            && is_string($payload['sub'] ?? null)
+            && is_int($payload['exp'] ?? null)
+            && $payload['exp'] >= now()->getTimestamp();
     }
 }
