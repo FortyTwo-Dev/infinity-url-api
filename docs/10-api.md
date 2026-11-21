@@ -134,7 +134,9 @@ RFC 9457 (`application/problem+json`), plus un champ `code` stable pour les clie
 validation_failed, unauthorized, forbidden, scope_missing,
 link_not_found, link_expired, link_blocked, slug_taken, slug_reserved,
 destination_blocked, destination_private_address,
-rate_limited, account_locked, totp_required,
+rate_limited, account_locked, totp_required, email_unverified,
+quota_exceeded, not_found, method_not_allowed, server_error,
+totp_already_enabled, recovery_code_invalid,
 totp_invalid, token_revoked
 ```
 
@@ -326,7 +328,8 @@ Les scopes sont stockés dans `abilities` de Sanctum et vérifiés par le middle
 
 | Scope | Donne accès à |
 | --- | --- |
-| `me:read` | `GET /me` et `GET /me/export` |
+| `me:read` | `GET /me`, `GET /me/export` et `GET /workspaces` |
+| `me:write` | **Dashboard uniquement** : `PATCH /me/password`, `DELETE /me`, `POST /auth/logout-all` et les routes 2FA. Jamais accordable à un jeton API |
 | `links:read` | Liste et détail des liens |
 | `links:write` | Création, édition, suppression |
 | `stats:read` | Statistiques et export CSV |
@@ -340,6 +343,7 @@ Règles :
 - `iQuiz` reçoit `me:read`, `links:read`, `links:write` et `stats:read`. Jamais `tokens:*`.
 - Les abilities `domains:read` et `domains:write` reviendront avec la v0.2, pas avant.
 - `tokens:write` permet de créer un jeton : c'est le scope le plus dangereux, il n'est jamais accordé à un client tiers.
+- `POST /tokens` **refuse** `me:write` et `*` dans les scopes demandés : sans cette allowlist, un jeton API pourrait changer le mot de passe ou supprimer le compte.
 - Un scope absent produit `403` avec `code: "scope_missing"`.
 
 ---

@@ -30,8 +30,8 @@ Ce document existe pour que la réponse soit préparée, pas improvisée.
 
 | Sujet | Règle |
 | --- | --- |
-| Alphabet | `abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789` (base62 moins `0`, `O`, `1`, `l`, `I`), 58 caractères |
-| Longueur | 7 caractères → ≈ 2,2 × 10¹² combinaisons |
+| Alphabet | `abcdefghijkmnopqrstuvwxyz23456789` — 26 lettres moins `l`, plus les chiffres `2` à `9` : **33 caractères**, tous sans ambiguïté à la lecture. **Minuscules uniquement** : un slug ne doit jamais dépendre de la casse |
+| Longueur | 7 caractères → 33⁷ ≈ **4,3 × 10¹⁰** combinaisons. Collision possible à grande échelle : générer, insérer, réessayer sur conflit (contrainte unique) |
 | Séquence | Jamais d'identifiant séquentiel, jamais de slug dérivé de l'ID de base |
 | Slug custom | Insensible à la casse, stocké en minuscules, 2 à 64 caractères, `[a-z0-9_-]` |
 | Suppression | Le slug est **tombstoné** : `410 Gone` pour toujours, jamais réattribué (D-51) |

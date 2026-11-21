@@ -110,7 +110,8 @@ On utilise la table `personal_access_tokens` de **Sanctum**, pas une table maiso
 alter table personal_access_tokens
     add column family_id uuid null,
     add column type text not null default 'access'
-        check (type in ('access','refresh'));
+        check (type in ('access','refresh')),
+    add column consumed_at timestamptz null;
 
 create index pat_family on personal_access_tokens (family_id);
 create index pat_type on personal_access_tokens (type);
@@ -125,6 +126,11 @@ create index pat_type on personal_access_tokens (type);
 Le jeton en clair n'est **jamais** stocké : Sanctum ne conserve que son SHA-256 et ne permet de l'afficher qu'une seule fois, à la création. `sanctum:prune-expired --hours=24` tourne quotidiennement.
 
 **Pourquoi Sanctum plutôt qu'une table maison** : le hachage, la recherche, l'expiration et la purge sont déjà écrits et éprouvés. Ce qu'on ajoute, c'est uniquement la rotation : `family_id` permet de révoquer toute une chaîne de jetons quand un refresh est rejoué.
+
+`consumed_at` est indispensable à la détection de rejeu : un refresh consommé
+doit rester lisible jusqu'à son expiration, sinon la famille qu'il faut révoquer
+n'est plus identifiable. Il est purgé par `sanctum:prune-expired`, comme les
+autres.
 
 Un jeton `refresh` ne peut appeler **aucune** route : il ne possède que l'ability `refresh`, et chaque route en exige une autre. C'est ce qui remplace le middleware de rejet qu'on aurait dû écrire.
 
