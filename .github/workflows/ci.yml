@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,16 +42,18 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      # Les actions sont épinglées par commit, pas par tag : un tag est
+      # mutable et peut être déplacé vers un autre code.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@4424c9aab975b57bd706ee5a39c6b4334d6e4f60 # 2.40.0
         with:
           php-version: '8.5'
           extensions: pdo_pgsql, redis, pcntl, intl, mbstring, sodium, dom, xml
           coverage: none
 
       - name: Cache Composer packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.composer/cache
           key: composer-${{ hashFiles('composer.lock') }}
