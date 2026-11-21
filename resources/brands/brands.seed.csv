@@ -1,0 +1,61 @@
+# Marques protégées — liste de départ (D-132)
+#
+# Aucun rang de popularité n'est conservé : le rang mesure les liens entrants,
+# pas la fiabilité, et n'est pas un signal de production (D-133 révisée).
+#
+# Construction : le Majestic Million a servi UNE FOIS, à la main, comme point de
+# départ. Il n'est ni versionné, ni téléchargé par un job, ni redistribué.
+#
+# Chaque entrée a été vérifiée : le domaine résout, il correspond bien à la
+# marque, et sa catégorie est renseignée. Une entrée manquante est bénigne,
+# une entrée erronée bloque un lien légitime : en cas de doute, ne pas ajouter.
+#
+# source : 'seed' (liste initiale), 'phishing-dump' (job de découverte), 'report'.
+# type   : 'registrable' (domaine enregistrable) ou 'hostname' (nom d'hôte complet).
+domain,category,type,source,checked_at
+laposte.fr,livraison,registrable,seed,2026-11-21
+colissimo.fr,livraison,registrable,seed,2026-11-21
+chronopost.fr,livraison,registrable,seed,2026-11-21
+mondialrelay.fr,livraison,registrable,seed,2026-11-21
+ameli.fr,sante,registrable,seed,2026-11-21
+doctolib.fr,sante,registrable,seed,2026-11-21
+caf.fr,gouvernement,registrable,seed,2026-11-21
+impots.gouv.fr,gouvernement,hostname,seed,2026-11-21
+ants.gouv.fr,gouvernement,hostname,seed,2026-11-21
+service-public.fr,gouvernement,registrable,seed,2026-11-21
+urssaf.fr,gouvernement,registrable,seed,2026-11-21
+francetravail.fr,gouvernement,registrable,seed,2026-11-21
+sncf-connect.com,transport,registrable,seed,2026-11-21
+ouigo.com,transport,registrable,seed,2026-11-21
+ratp.fr,transport,registrable,seed,2026-11-21
+blablacar.fr,transport,registrable,seed,2026-11-21
+orange.fr,telecom,registrable,seed,2026-11-21
+sfr.fr,telecom,registrable,seed,2026-11-21
+bouyguestelecom.fr,telecom,registrable,seed,2026-11-21
+free.fr,telecom,registrable,seed,2026-11-21
+red-by-sfr.fr,telecom,registrable,seed,2026-11-21
+b-and-you.fr,telecom,registrable,seed,2026-11-21
+credit-agricole.fr,banque,registrable,seed,2026-11-21
+societegenerale.fr,banque,registrable,seed,2026-11-21
+lcl.fr,banque,registrable,seed,2026-11-21
+fortuneo.fr,banque,registrable,seed,2026-11-21
+hellobank.fr,banque,registrable,seed,2026-11-21
+boursobank.com,banque,registrable,seed,2026-11-21
+leboncoin.fr,commerce,registrable,seed,2026-11-21
+vinted.fr,commerce,registrable,seed,2026-11-21
+cdiscount.com,commerce,registrable,seed,2026-11-21
+fnac.com,commerce,registrable,seed,2026-11-21
+darty.com,commerce,registrable,seed,2026-11-21
+carrefour.fr,commerce,registrable,seed,2026-11-21
+auchan.fr,commerce,registrable,seed,2026-11-21
+e.leclerc,commerce,registrable,seed,2026-11-21
+airbnb.fr,commerce,registrable,seed,2026-11-21
+booking.com,commerce,registrable,seed,2026-11-21
+paypal.com,paiement,registrable,seed,2026-11-21
+revolut.com,paiement,registrable,seed,2026-11-21
+apple.com,tech,registrable,seed,2026-11-21
+microsoft.com,tech,registrable,seed,2026-11-21
+netflix.com,media,registrable,seed,2026-11-21
+canalplus.com,media,registrable,seed,2026-11-21
+lemonde.fr,media,registrable,seed,2026-11-21
+lefigaro.fr,media,registrable,seed,2026-11-21

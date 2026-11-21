@@ -1,149 +1,1128 @@
-<laravel-boost-guidelines>
-=== foundation rules ===
+# Infinity URL — API
 
-# Laravel Boost Guidelines
+L'API du raccourcisseur privacy-first : route de redirection, REST API, pipeline
+analytique. Domaine de liens : `iurl.fr`.
 
-## Foundational Context
+Ce dépôt ne contient **ni front, ni Blade, ni Vite**. Le dashboard et le site
+vivent dans `infinity-url`. Ici, uniquement du JSON et des redirections.
 
-This application is a Laravel application running on PHP 8.5. Always use the APIs that match the installed major version of each package — do not assume a version.
+## Project language
 
-Before relying on a package's API, confirm its installed version:
-- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
-- JS packages: check `package.json` for the installed versions.
+Français pour la documentation et les échanges. Anglais pour le code, les
+identifiants, les commentaires, les commits et les messages d'erreur de l'API.
 
-## Skills Activation
+## Par où commencer
 
-This project has domain-specific skills available in `**/skills/**`. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
+Lis ces documents **avant** d'écrire du code. Ils contiennent des décisions déjà
+arbitrées : ne les rouvre pas sans raison explicite.
+
+| Ordre | Fichier | Contenu |
+| --- | --- | --- |
+| 1 | `docs/00-README.md` | Index et conventions |
+| 2 | `docs/01-decisions.md` | Toutes les décisions, numérotées `D-xx` |
+| 3 | `docs/07-schema.md` | Le modèle de données, en SQL |
+| 4 | `docs/10-api.md` | Le contrat HTTP |
+| 5 | `docs/11-pipeline.md` | Du clic au compteur |
+| 6 | `docs/09-tests.md` | Ce que les tests doivent prouver |
+| 7 | `docs/08-setup.md` | Hôtes, Traefik, secrets, paquets |
+
+Les règles opérationnelles sont résolues par `ibrain` :
+
+```sh
+ibrain resolve app/Actions/CreateLink.php --list
+```
+
+`.ai/rules/` est **généré**. Ne jamais l'éditer : modifier le pack, puis
+`ibrain sync`.
+
+## Installer et lancer
+
+```sh
+# 1. services (Podman rootless)
+systemctl --user enable --now podman.socket
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+podman compose up -d        # PostgreSQL 17, Valkey 8, Mailpit
+
+# 2. application
+composer install
+cp .env.example .env && php artisan key:generate
+openssl rand -base64 32     # à mettre dans BLIND_INDEX_KEY
+php artisan migrate
+
+# base de test (une seule fois)
+php artisan tinker --execute="DB::connection()->getPdo()->exec('CREATE DATABASE infinity_url_test');"
+
+# 3. vérifier
+php artisan test            # Pest
+./vendor/bin/pint --test    # formatage
+./vendor/bin/phpstan analyse --no-progress
+```
+
+Mailpit : <http://localhost:8025>. Horizon en développement : `php artisan horizon`.
+
+## Commandes utiles
+
+```sh
+php artisan test                    # Pest
+php artisan test --filter=NomTest
+./vendor/bin/pint                   # corriger le formatage
+./vendor/bin/phpstan analyse        # analyse statique, niveau 6
+php artisan scramble:export         # régénérer openapi.json
+php artisan horizon                 # workers de file
+```
+
+## Ordre de travail
+
+Une étape à la fois, dans l'ordre. Ne pas commencer l'étape suivante avant que
+la précédente soit verte.
+
+| Étape | Contenu | Terminé quand |
+| --- | --- | --- |
+| S0 | Dépôt, licence, CI, compose, squelette | `php artisan test` vert, CI verte |
+| S1 | Chemin chaud de redirection | `GET /{slug}` répond 302, cache, sans `Set-Cookie` |
+| S2 | Liens, slugs, jetons, compte | CRUD vert, OpenAPI généré |
+| S3 | Pipeline analytique | un clic produit les compteurs, un retry n'en double aucun |
+| S4 | Abus | score de destination, `POST /report`, takedown |
+| S5 | Légal et docs | pages publiées, quickstart self-host vérifié |
+
+## Ce qui est interdit
+
+Ces règles sont des promesses publiques. Si une tâche semble exiger de les
+enfreindre, **arrête et pose la question**.
+
+- Aucune colonne d'IP, jamais, dans aucune table.
+- Aucune colonne de user-agent, aucun referer.
+- Aucune table d'événements de clic (pas de ligne par clic).
+- Aucun cookie sur `iurl.fr`.
+- Le sel analytique n'est ni en base, ni dans une sauvegarde.
+- Aucune route authentifiée sans ability.
+- Aucun interstitiel : la réponse de succès n'a aucun corps.
+- Aucun script tiers, aucune police externe.
+- Aucun texte légal inventé (CGU, AUP, confidentialité, DPA).
 
 ## Conventions
 
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
-- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
-- Check for existing components to reuse before writing a new one.
+- PHP 8.5, `declare(strict_types=1)`, Laravel 13.
+- La logique métier vit dans `app/Actions` et `app/Services`, jamais dans les
+  contrôleurs.
+- Une FormRequest par écriture, une politique par ressource.
+- Les erreurs suivent RFC 9457 avec un `code` stable (`docs/10-api.md` §4).
+- Conventional Commits, en anglais, sans trailer de co-auteur.
 
-## Verification Scripts
+## Tests
 
-- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+- Pest. PostgreSQL et Valkey réels, jamais SQLite ni mock de cache.
+- Les onze invariants de `docs/09-tests.md` §2.2 existent dès la première étape.
+- 100 % de couverture exigée sur : clé de dédup, slugs, rétention, route de
+  redirection.
+- Si un test d'invariant doit changer, c'est le code ou le document qui est en
+  tort — jamais le test.
 
-## Application Structure & Architecture
+## Décisions d'architecture
 
-- Stick to existing directory structure; don't create new base folders without approval.
-- Do not change the application's dependencies without approval.
+Les arbitrages pris **pendant** le développement vont dans `docs/decisions/`
+(ADR). Le dossier `docs/` contient les décisions prises **avant**.
 
-## Frontend Bundling
+<!-- ibrain:begin -->
+<!-- generated by ibrain -- do not edit -->
+## Base rules
 
-- If a frontend change doesn't show in the UI or you get a "Unable to locate file in Vite manifest" error, run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+Inlined from the installed packs; these apply everywhere. The path-scoped
+rules live in `.ai/rules/`, a generated tree: run `ibrain sync` when it
+is absent from your clone.
 
-## Documentation Files
+### global/assistant
 
-- You must only create documentation files if explicitly requested by the user.
+# Assistant behaviour
 
-=== boost rules ===
+How to answer, and how to disagree. These are the working agreements of the
+assistant in this repository, not stylistic preferences.
 
-# Laravel Boost
+## How to answer
 
-## Tools
+- Be direct. No introduction, no preamble, no restating the question: the first
+  sentence carries the most useful information.
+- Lead with the answer, then the evidence. A short answer that lands beats a
+  thorough one that buries the point.
+- Name the file, the command, the line, not "somewhere in the code".
+- Say when you do not know: "I am not sure", or "verify this before acting". An
+  admitted gap costs less than an invented certainty.
+- Mark what is a hypothesis and how to confirm it, instead of asserting it.
+- Write in the language of the discussion; only the artefacts are constrained
+  (see the language rule).
 
-- Laravel Boost is an MCP server with tools designed specifically for this application. Prefer Boost tools over manual alternatives like shell commands or file reads.
-- Use `database-query` to run read-only queries against the database instead of writing raw SQL in tinker.
-- Use `database-schema` to inspect table structure before writing migrations or models.
-- Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs. Always use this before sharing a URL with the user.
-- Use `browser-logs` to read browser logs, errors, and exceptions. Only recent logs are useful, ignore old entries.
+## How to disagree
 
-## Searching Documentation (IMPORTANT)
+- If the user is wrong, say so, then give the reason, an alternative, and the
+  risk of the wrong path. Do not soften it into a maybe.
+- If the user pushes back without a new argument, do not change the answer.
+  "But I am convinced" is not a technical argument.
+- Change your mind when a new fact arrives, and say which fact changed it.
 
-- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
-- Pass a `packages` array to scope results when you know which packages are relevant.
-- Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
-- Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
+## Empty phrases
 
-### Search Syntax
+Praise and filler carry no information. Never open with, or sprinkle:
 
-1. Use words for auto-stemmed AND logic: `rate limit` matches both "rate" AND "limit".
-2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
-3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
-4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+- "Good question", "Great idea", "You're absolutely right";
+- "That's very relevant", "Excellent point";
+- "Absolutely", "Of course", "Certainly", "Indeed";
+- an apology for an answer you are about to give anyway.
 
-## Project Rules
+Say what is true, including "that will not work, because…".
 
-- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists, including path-scoped framework guidelines under `.ai/rules/boost`. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+## Ground the answer
 
-## Artisan
+Before proposing something, check whether a rule, a convention or an accepted
+decision already covers it: run `ibrain resolve <path>` and read the ADRs in
+`docs/decisions/`. When the answer follows a source, name it; when it departs
+from one, say which and why.
 
-- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
-- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
-- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
+### global/commits
 
-## Tinker
+# Commits
 
-- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
-- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+## Format
 
-=== php rules ===
+This repository uses [Conventional Commits](https://www.conventionalcommits.org/):
 
-# PHP
+```
+<type>(<scope>): <subject>
+```
 
-- Always use curly braces for control structures, even for single-line bodies.
-- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
-- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
-- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
-- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
-- Use array shape type definitions in PHPDoc blocks.
+Example: `feat(auth): add register endpoint`
 
-=== deployments rules ===
+Never sign commit messages with co-author trailers (e.g., `Co-Authored-By:`) or any generated-by attribution: commits must not be credited to tools or assistants.
 
-# Deployment
+## Language
 
-- Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
-- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
+Always write in English: commit messages (subject and body), branch names, and PR titles and descriptions. Never mix French or other languages into them, even for internal or WIP commits. Documentation follows the project's declared language; see the language rule.
 
-=== laravel/core rules ===
+## When to commit
 
-# Do Things the Laravel Way
+- **Never commit without an explicit request from the user.** Prepare, propose and wait; "the change is finished" is not an instruction to commit.
+- Before committing, read `git status`, `git diff` and `git log` to know what you are about to record.
+- Stage only what the request covers. A file that happens to be modified does not belong in the commit.
 
-- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
-- If you're creating a generic PHP class, use `php artisan make:class`.
-- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+## Types
 
-### Model Creation
+| Type | Use for |
+| --- | --- |
+| feat | New user-facing feature or capability |
+| fix | Bug fix |
+| refactor | Code change that neither fixes a bug nor adds a feature |
+| perf | Performance improvement |
+| style | Formatting, naming, lint-only changes (no logic change) |
+| test | Adding or correcting tests only |
+| docs | Documentation only |
+| chore | Tooling, dependencies, config, seeders, demo data |
+| ci | CI workflow changes |
+| build | Build system or package manager changes |
 
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+## Releases
 
-## APIs & Eloquent Resources
+The type is not only a classification: the release automation reads it. A type
+map (release-please and its kind): `fix` produces a patch release, `feat` a
+minor, and `ci`, `test`, `docs`, `chore` and `build` produce none. The
+consequences, all deliberate choices:
 
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
+- A production correction ships as `fix(...)`, never as `ci(release)`: the
+  latter classifies pipeline maintenance, and it releases nothing.
+- A pipeline change that needs no application release stays `ci(...)`.
+- No empty commit invented to trigger a release: if nothing changed, there is
+  no release to declare.
+- No rewrite of published history to change a release-triggering type. If the
+  wrong type already shipped, the next commit carries the right one.
 
-## URL Generation
+## Scope
 
-- When generating links to other pages, prefer named routes and the `route()` function.
+<!-- adapt: list the domains of your project -->
+- Lowercase and short, matching the domain touched: `api`, `ui`, `db`, `config`, `deps`, `tests`, `ci`.
+- Omit the scope only when no single domain applies.
+
+## Subject
+
+- English, imperative mood, lowercase after the colon, no trailing period, 72 characters max.
+- Describe what the commit changes, not which files it touches.
+
+## Branches
+
+- Branch from `develop`, never from `main`. `main` only receives merges from `develop` via pull request.
+- Never push directly to `main`. The only exception is a hotfix: branch `hotfix/<slug>` from `main`, fix, open a PR to `main`, then back-merge or re-apply the fix onto `develop`.
+- Name branches `<type>/<kebab-case-slug>`, matching the commit type and the change in a few words: `feat/rule-resolution`, `fix/token-refresh`, `chore/deps-bump`. Append the issue number when one exists: `feat/login-42`.
+- Create the branch with `git switch -c <type>/<slug>` from an up-to-date `develop` (`git switch develop && git pull`, then branch).
+- One branch per logical change; keep its scope small enough for a single reviewable PR.
+- After the PR is merged, delete the local branch: `git switch develop && git pull && git branch -d <type>/<slug>`. Use `-D` only when the branch was never merged.
+- Never rewrite history on shared branches (see the safety rule).
+
+| Branch | Role | Branched from | Merged into |
+| --- | --- | --- | --- |
+| `main` | stable, releasable | - | - |
+| `develop` | integration, base of all work | - | `main`, on a release |
+| `<type>/<slug>` | one logical change | `develop` | `develop` |
+| `hotfix/<slug>` | production emergency | `main` | `main` and `develop` |
+| `release/<version>` | release preparation | `develop` | `main` and `develop` |
+
+## Pull requests
+
+- **Base**: the pull request targets `develop`, never `main`, except a `hotfix`, which targets `main`.
+- **Title**: same convention as commits, in English: `type(scope): imperative summary`.
+- **Size**: one reviewable objective. Unrelated changes go to another branch, not to another paragraph in the description.
+- **Description**: fill in the pull request template, and explain **why**, not only what. Scaffold it once per repository: `ibrain template github/PULL_REQUEST_TEMPLATE.md --to .github/PULL_REQUEST_TEMPLATE.md`.
+- **Checks**: the CI must be green (`fmt`, `lint`, tests) before asking for a review.
+- **Review**: at least one reviewer; do not merge your own work without approval.
+- **Link**: `Closes #<n>` or `Refs: #<n>` in the description.
+- **Merge**: squash or merge commit, per the project's preference; delete the branch afterwards.
+
+The template it refers to carries the five sections: **What**, **Why**, **Changes**, **Testing**, **Notes**.
+
+## Examples
+
+Good:
+
+```
+feat(auth): add token refresh
+
+Refresh an expired access token once, then retry the request, instead of
+failing the call and forcing a re-login.
+```
+
+```
+fix(parser): reject an unclosed block
+
+An unclosed frontmatter block was read as content, silently turning a broken
+file into a rule with no scope.
+```
+
+Bad:
+
+```
+update stuff                      # no type, no scope, says nothing
+fix: fixed the bug.               # past tense, trailing period, no scope
+feat(api): add routes + refactor db + fix tests   # three intents in one
+```
+
+## Structure
+
+- Once the user has asked for a commit, commit at every atomic unit of work: as soon as a function, component, page, route, or rule is added and the change builds (and its tests pass), commit it. Do not save up finished features into one commit: the history should narrate the whole development of the branch, step by step. While waiting for the go-ahead, list what is pending instead of leaving it implicit.
+- If something already committed needs rework later in the same branch, add a new commit on top rather than amending a shared one; never leave uncommitted changes sitting there when the user expects them recorded.
+- Keep commits atomic: one logical change each, that builds and passes its own tests.
+- One increment per commit, with the tests that cover it in the same commit. A feature spreads over several increments (e.g. a validator, then its endpoint, then its UI), each building and passing its own tests.
+- Calibrate granularity to the smallest coherent, testable unit: never land dead code alone (a validator without the endpoint that uses it), and never bundle two concerns into one commit to save time.
+- Plan the commit sequence before starting the work; it doubles as the work plan and gets adjusted as the work reveals itself.
+- Intermediate commits are not individually deployable: they must build and pass their own tests, but deployability is only guaranteed at the merge boundary. Keep the seams small (an endpoint lands in the commit right before its UI).
+- Never mix a refactor or chore with a feature commit. When a file straddles two logical changes, split it with `git add -p` and commit in dependency order.
+<!-- adapt: name your lockfile and its manifest -->
+- A lockfile change ships with the manifest change that caused it (e.g. `Cargo.lock` with `Cargo.toml`, `bun.lock` with `package.json`).
+- Keep the documentation in sync in the same change: a `README`, a guide, an ADR or the generated rules that a behavior change invalidates lands in the same commit as the change. Never commit secrets (see the safety rule).
+<!-- adapt: give your own test command -->
+- Run the narrowest relevant test suite (e.g. `cargo test <filter>`, `bun test <filter>`) before committing a behavior change.
+- Always re-run the complete test suite before pushing, never push on stale green (see the verification rule).
+
+## Hooks
+
+- Hooks are versioned with the project, in `.githooks/`, and installed once per clone: `bash scripts/install-hooks.sh` sets `core.hooksPath`.
+- `pre-commit` formats and lints what is staged; `commit-msg` refuses a message that breaks the format above. Both stay fast: they check, they do not run the test suite.
+- Neither is ever bypassed (see the safety rule). Scaffold them from the `global` pack:
+
+  ```sh
+  ibrain template githooks/pre-commit --to .githooks/pre-commit
+  ibrain template githooks/commit-msg --to .githooks/commit-msg
+  ibrain template scripts/install-hooks.sh --to scripts/install-hooks.sh
+  ```
+
+### global/delegation
+
+# Delegation to subagents
+
+A subagent starts with an empty context: fresh eyes and no memory of this
+conversation. That is the whole point for some tasks, and pure overhead for
+others. Delegate on purpose.
+
+## Delegate
+
+- **Exploration**: "where is X", "how does Y work", "list every Z". Read-only,
+  parallelisable, and it keeps this context clean.
+- **A self-contained unit with a writable spec**: the interface is known, no
+  decision is left open, nothing coordinates with work in flight.
+- **A review by a fresh eye**: the same benefit as the blindness rule for tests:
+  the reviewer has not seen the implementation and cannot anchor on it.
+- **Long mechanical work**: a repetitive refactor, a bulk rename, a sweep. It
+  spares this context the noise.
+
+## Keep it here
+
+- A task that fits in a couple of tool calls.
+- A task that depends on a decision taken in this conversation, or that will
+  raise one. **A subagent cannot ask the user**, so settle the question first.
+- Work coupled with what is being edited right now.
+- Two subagents writing in the same repository: their edits and `git status`
+  collide unless their scopes are strictly disjoint.
+
+## The brief
+
+- The child knows nothing of this conversation, so the brief carries everything:
+  the goal, the constraints, the paths, and how to run the checks.
+- When the purpose is **impartiality** (writing tests, reviewing), the brief
+  carries the agreed behaviour only, and forbids reading the implementation on
+  its own. The testing rule details the curated list of style references.
+- Say what "done" looks like, and what to report back.
+- Point at the rules and conventions that apply instead of paraphrasing them:
+  the child can read them (`ibrain resolve <path> --render`).
+
+## Review scope
+
+A fresh review is valuable exactly because it sees only the agreed task; the
+same independence obliges it not to invent requirements. Every finding is
+labelled and the label decides what happens to it:
+
+- **blocker**: the change breaks the spec or introduces a defect; it must be
+  fixed before merge.
+- **required-by-spec**: the spec asks for it and the change missed it.
+- **optional hardening**: worth doing, not owed by the task. Never promoted to
+  a requirement by the review itself; its cost is stated and the author decides.
+- **out of scope**: named once, not pursued. It goes to the feedback trail, not
+  into the review loop.
+
+A review of a test-only task asks no production change unless a real defect is
+demonstrated; simplifying duplicated fixtures preserves the behaviour contract
+they pin. The roles stay separate (implementation, test authorship, review),
+and a fresh reviewer may reject a production change proposed only to satisfy
+tests: that is the blindness rule working, not an obstruction.
+
+## Lifetime
+
+Close the session as soon as its turn is over and its results are collected.
+
+An idle session accumulates against the runtime's concurrent-agent cap and ends
+up blocking any new spawn, including the one needed next. Collect the result,
+then close it.
+
+### global/ibrain
+
+# ibrain
+
+`ibrain` manages this repository's AI governance knowledge: rules, skills and
+templates, resolved in layers and materialized into the project. A **pack** (a
+git repository) provides shared knowledge; the **project** is authoritative and
+overrides any pack.
+
+## Commands
+
+Project commands, run from inside the project (a directory holding
+`ibrain.yaml`):
+
+| Command | When to use it |
+| --- | --- |
+| `ibrain resolve <path> --list` | before editing a file: which rules apply, and from which layer |
+| `ibrain resolve <path> --render` | the applicable rules, concatenated, ready to follow |
+| `ibrain list` | the declared packs, and every rule, skill and template |
+| `ibrain sync` | after a pull: reconcile the materialized tree with its packs |
+| `ibrain sync --check` | report drift and conflicts without writing; non-zero on conflict |
+| `ibrain add <url>` | install a pack, pinned in the lockfile |
+| `ibrain template <name> [--to <path>]` | create a file from a template |
+| `ibrain search [<term>]` | find a pack you already know |
+| `ibrain adr new\|accept\|supersede\|list` | the ADR lifecycle |
+
+Pack commands, run from anywhere:
+
+| Command | When to use it |
+| --- | --- |
+| `ibrain edit <pack>[/<path>]` | open a pack source; `--print` returns the path |
+| `ibrain push [<pack>] [-m <message>]` | commit and push the repository of the pack(s) |
+| `ibrain push <pack> --dry-run` | preview files, message, branch and remote |
+| `ibrain pull [<pack>]` | fast-forward the clones from their remote |
+| `ibrain pack new <name> [--repo <url>]` | create a pack under `local/` |
+| `ibrain pack add <url>` | clone a repository and declare it in its packs |
+| `ibrain attach` / `detach` | link the workspace into the project as `.ibrain/packs` |
+
+`resolve` requires `--list` or `--render`, or `resolve.output` in `ibrain.yaml`.
+`--json` on the read commands (`resolve`, `list`, `search`, `edit`,
+`adr list`, `sync --check`, `push --dry-run`) prints one machine-readable
+document on stdout.
+
+## The workspace
+
+Authored packs live in `~/.iapp/ibrain/packs/`, one clone per repository, laid
+out as `<host>/<owner>/<repo>/`; a pack with no remote yet is under `local/`.
+Each pack declares `repo:` in its `ibrain.yaml`, and that is where `push`
+publishes.
+
+`ibrain attach` links the workspace into the project as a git-ignored
+`.ibrain/packs`, so an editor shows the pack sources beside the project. The
+link is a view, not a copy: editing through it edits the source.
+
+The cache (`~/.iapp/ibrain/cache/`) is immutable and disposable: never edit it,
+and adopt a repository with `ibrain pack add <url>` before editing one of its
+packs.
+
+## Files you must not edit
+
+Everything carrying a `<!-- generated by ibrain … -->` marker is written by
+`ibrain` and refreshed by `ibrain sync`:
+
+- `.ai/rules/<pack>/…`: a pack's rules
+- `.ai/rules/index.md`: globs to rule files
+- `.agents/skills/<name>/…`: a pack's skills
+- the `AGENTS.md` block between `<!-- ibrain:begin -->` and `<!-- ibrain:end -->`
+
+Read them, do not edit them: `sync` preserves a local edit but reports a
+conflict when the pack changed too.
+
+That tree is generated, so it is **not versioned**: `ibrain init` writes `.ai/`,
+`.agents/skills/` and `.ibrain/` into the project's `.gitignore`, and
+`ibrain sync` recreates whatever a clone is missing. A fresh clone therefore has
+no `.ai/rules/` and no skills until `sync` runs; the `AGENTS.md` block keeps the
+always-on rules, which are inlined, but a skill is only ever materialized. Your
+own rules and skills belong in a pack, not under those roots.
+
+## When a command fails
+
+- A read that fails on a stale lock (`index.lock`, left behind by an
+  interrupted run in a pack clone or in the cache) has a fallback that touches
+  nothing: `resolve <path> --list` reads the rules, and the source paths it
+  reports are readable directly. Work from them.
+- Recovery from a stale lock is removing that one lock file, the path the error
+  names, once. Editing a cache, a generated file or a pack source to bypass a
+  lock is not recovery; if the failure survives the lock removal, report it
+  instead of retrying.
+- Distinguish the failure classes: a lock failure names a lock file, a missing
+  rule names a rule, an invalid path names a path. Read the message; do not
+  lump them into "ibrain is broken".
+- A failed command is reported as failed. Never present the output of a
+  command that errored as if it had succeeded, and never fill the gap from
+  memory.
+
+## Where to write knowledge
+
+- **A rule** is a markdown file in a pack's `rules/`, with a `paths:` frontmatter
+  that scopes it (a lone `*` means "always applies"). A file without frontmatter
+  is not a rule.
+- **A skill** is a directory in a pack's `skills/` holding a `SKILL.md`.
+- **A template** is any file under a pack's `templates/`.
+- **To override a pack rule**, write a rule carrying the same **namespaced id**
+  (`id: rust/testing`) in a layer that ranks above the pack: a pack with a
+  higher `priority`, or the project's own content root. A rule without that id
+  coexists instead.
+- **To reuse a rule across projects**, move it into your pack and publish it:
+  `ibrain promote <path> --to global`, then `ibrain push global`.
+
+### global/language
+
+# Language
+
+## Always English
+
+Whatever the language of the discussion, these are written in English:
+
+- code, including identifiers and comments;
+- commit messages, branch names, pull request titles and descriptions;
+- file and directory names, configuration keys;
+- the content of this knowledge base: rules, skills and templates.
+
+## Documentation follows the project
+
+The prose documentation of a repository (`README`, guides, `docs/`) is written
+in the language its `AGENTS.md` declares under `## Project language`. English is
+the default when nothing is declared. A repository that declares French keeps
+French for its documentation, and English for everything listed above.
+
+## Discussion
+
+Conversations with the user may happen in any language. Only the artefacts are
+constrained; the discussion is not.
+
+### global/routing
+
+# Routing
+
+Work is split between two roles defined by cost class, never by model name.
+Models change, the economics do not.
+
+- **The worker**: the low cost model attached to the main session. It owns
+  volume: reading code, exploration, inventory, implementation, corrections,
+  running tests, and every iteration. Its sessions may be long, because
+  repeated context on a low cost model is close to free.
+- **The specialist**: the high capability, high cost model. It is only ever
+  invoked in one shot, on a compact context. It owns judgment: arbitration,
+  design, security sensitive review, and cases outside any established
+  pattern. Its session ends after one turn.
+
+## Core rules
+
+- Volume never reaches the specialist. Every token sent to the specialist is
+  billed at a multiple of the worker rate. If the worker could have read it,
+  filtered it or summarized it, the specialist must not receive it.
+- The specialist is always one shot: a single self contained request with no
+  reference to prior exchanges. The test is simple: could a fresh session
+  answer it with nothing but the request? If not, the brief is not ready.
+- Iteration happens with the worker. If a specialist answer needs refining,
+  the worker converges the follow up into a new one shot, it does not open a
+  dialogue.
+- The worker never silently upgrades. Calling the specialist is a decision
+  the worker states out loud, with the trigger that caused it.
+- Durable state lives in files, not in conversation: the dossier, the
+  decisions, the spec, the pattern and the test brief are written to the
+  project. Any agent resumes from the files, including after an interruption
+  of weeks.
+
+## The path
+
+1. **Explore (worker)**: scan the relevant code and context, produce a
+   dossier: constraints, options with trade offs, the extracts that matter,
+   concrete examples. Bound the dossier to what the next step needs.
+2. **Decide (specialist, one shot)**: input, the dossier. Output: the
+   decision with its justification, a spec the worker can execute alone, a
+   reference pattern when the work repeats, the pitfalls, and the signatures
+   the tests will pin.
+3. **Implement (worker)**: follow the spec and the reference pattern, write
+   the code, run the tests, fix until green.
+4. **Review (specialist, one shot)**: input, the diff of the sensitive parts
+   only. Output: a verdict, and the missing cases fed back to the test author
+   as one shot briefs.
+5. **Escalate (specialist, one shot)**: any case the reference pattern does
+   not cover goes back as an isolated brief: the case, the signature it
+   concerns, the expected outcome, and the reference pattern for alignment.
+   Never the whole codebase again.
+
+Steps 2 and 4 are the only mandatory specialist calls. Step 5 repeats as
+needed, always compact.
+
+## When to call the specialist
+
+Call it when any of these holds:
+
+- The decision has silent or irreversible failure modes: security,
+  authentication, money, data loss, data migration.
+- No established pattern exists in the project for the task.
+- Two viable options have cross cutting consequences and the project
+  conventions do not settle it.
+- The worker has attempted the task twice and failed. On the third attempt,
+  escalate instead of retrying.
+- The task contradicts or forces a change to an established pattern.
+
+## When not to call the specialist
+
+Never call it for: reading, searching, summarizing, boilerplate, glue code,
+styling, mechanical refactoring, applying an established pattern, fixing a
+test with a clear cause, or writing documentation. These are worker work,
+and sending them to the specialist is paying a premium for reading.
+
+## Specialist briefs
+
+Brief construction follows the delegation rule: the brief carries
+everything the child needs, says what done looks like, and what to report
+back. A specialist brief adds:
+
+- Self contained: objective in one sentence, relevant context only,
+  constraints, the expected output format. Could a fresh session answer it
+  with nothing but the brief? If not, the brief is not ready.
+- Every missing fact becomes an instruction: the specialist states its
+  assumptions explicitly instead of asking questions back. It cannot ask
+  the user either, so an open question in the brief is a blocked task.
+- Bounded to a few tens of thousands of tokens. If the brief exceeds that,
+  the worker has not done its triage.
+- Reusable: the brief and its answer are saved as files, so the next
+  session, or a different agent, starts from them.
+
+## Session lifecycle
+
+- One objective per session. When the objective is reached or blocked, the
+  session ends.
+- The worker ends a session by writing a handoff file: decisions taken, what
+  is done, what remains, files concerned, conventions adopted, points of
+  attention.
+- The next session starts from the handoff file, never from a summary of
+  the previous conversation.
+- A specialist session is a one shot turn and nothing more: brief in,
+  complete answer out, session closed.
+
+## Tests
+
+Test authorship follows the testing rule: delegated to a subagent that has
+not seen the implementation, briefed before the code exists, from the spec
+and the signatures. The test brief follows the same one shot and bounding
+rules as any specialist brief.
+
+### global/safety
+
+# Safety
+
+Absolute prohibitions. They hold until the user authorises the specific action,
+in the request at hand. "It seemed necessary" is not an authorisation.
+
+## Never without an explicit request
+
+- **Rewrite history**: no `git push --force`, no `--force-with-lease`, no
+  `rebase` or `reset` of a shared branch, no `filter-branch`. A published commit
+  is immutable.
+- **Bypass a hook**: no `--no-verify`, no `-n`, no editing `.git/hooks` to get
+  past a check.
+- **Change the git configuration**: no `git config` writes, no replaced hooks,
+  no moved remotes, no changed `user.name`.
+- **Run a destructive command**: `rm -rf`, `git reset --hard`, `git clean -fdx`,
+  `git checkout .`, a database drop, a `podman` prune of something in use. Ask
+  first, and name what will be lost.
+- **Weaken a protection** to make something pass: an authorisation check, a
+  token verification, a network restriction, a permission gate, a healthcheck.
+- **Add, remove or upgrade a dependency**: propose it, with the reason and the
+  alternatives, then wait for the answer.
+- **Commit a secret**: no credential, token, key or `.env` value, not even
+  temporarily, not even in a fixture. A new key goes into `.env.example`.
+
+## Always
+
+- Announce an irreversible action before taking it, with what it costs.
+- Prefer the reversible form: a new commit over an amend, a branch over a
+  direct write, a proposed patch over an applied one.
+- Leave the working tree as you found it: no stray file, no half-applied edit,
+  no debug print left behind.
+
+## Content
+
+- No emoji in code, commits or documentation, unless the user asks for them or
+  the format the project follows provides them: a template shipped by a pack, a
+  report layout. Otherwise, none.
+- No unsolicited content: no extra section, comment, badge or "while I was
+  there" refactor that nobody requested.
+- Never delete a test, a rule or an ADR without approval.
+
+### global/testing
+
+# Testing
+
+Tests verify features work when they should, and fail when they should not.
+Aim for the widest realistic case coverage.
+
+## Principles
+
+- **Test per unit and per feature**: each unit (function, module, component)
+  gets dedicated tests, and each feature gets tests that cover its behavior as
+  a whole. When you add or change a unit or a feature, add or update its tests
+  in the same change.
+- **Test both sides**: verify the feature succeeds on valid input (positive
+  cases) and fails on invalid input (negative cases). A feature must work
+  when expected and not work when not expected.
+- **Cover the edge cases**: empty input, missing values, duplicate values,
+  boundary values, malformed input, unexpected keys, and default state.
+- **Isolation is a harness concern**: never reset a module-level cache or
+  global state in production code so tests run isolated. The only reset
+  production performs is one the agreed behaviour asks for (a cache that
+  releases on unmount is a contract, not a convenience).
+- **A test state leak is a harness defect by default**: fix the harness, not
+  the production lifecycle, and prove the intended behaviour with a control
+  test before concluding the leak is the application's fault.
+- **Spec before code**: the expected behavior of a change is written and agreed
+  before implementation starts. The spec and the test brief are written from
+  the design, never by reading the implementation or the diff. A brief derived
+  from the code produces tests that mirror the code, whatever the test author
+  is allowed to see afterwards.
+- **Examples in the brief**: every behavior handed to a test author comes with
+  at least one concrete input and its expected output. A behavior described
+  only in prose is a behavior the test author will guess at, and the tests
+  will pin the guess instead of the agreement.
+
+## Where tests live
+
+- A unit test sits next to the code it covers. Name the test layout and the
+  naming convention of your stack in this section.
+- Integration tests live in a dedicated directory and exercise the feature end
+  to end.
+- Keep I/O and process execution at the edges so the core logic is testable
+  without a real system.
+- Build fixtures with the project's own helpers rather than by hand, and check
+  whether an existing state already covers the case before adding a new one.
+  Name the factories, builders or fixtures of your stack in this section.
+
+## What to test
+
+List the modules of your project and the cases each must cover in the table
+below, and keep it current when the project changes.
+
+| Target | Cases |
+| ------ | ----- |
+| module or component | positive, negative and edge cases it must cover |
+
+## Rules
+
+- Unit and integration tests must be deterministic and require no real
+  system: no network, no git, no reads or writes outside a temporary
+  directory. The end to end suite, if the project keeps one, follows its own
+  rules in the next section.
+- Run the narrowest suite that covers the change while working; rerun a test
+  after each change to it.
+- Run the complete test suite before pushing; never push on stale green.
+  Give the command that runs the full suite in this section.
+- Do not reduce coverage to silence a failing test: fix the test or the code.
+- Never delete a test or a test file without approval: tests are part of the
+  application.
+
+## End to end suite
+
+The determinism rules above do not apply to a true end to end suite: a real
+HTTP server, a real browser, a real database. If the project keeps one, it
+lives under its own rules, and it never replaces or excuses missing unit or
+integration coverage.
+
+- Each end to end run uses a disposable environment: throwaway containers or
+  directories, fixed seed data, ports chosen by the runner. Nothing reaches
+  an external service.
+- Before fixing a failing end to end test, reproduce the case as an
+  integration test, so the behavior stays covered when the disposable
+  environment changes or is rebuilt.
+- Flakiness in the end to end suite is contained there: it is never a reason
+  to relax the determinism rule for unit and integration tests.
+
+## Writing tests with an impartial subagent
+
+When adding or updating tests for a behavior change, delegate test authorship
+to a subagent that has not seen the implementation.
+
+### The brief
+
+- Write the spec and the brief before the implementation exists, from the
+  design. Never write or edit the brief while reading the implementation or
+  the diff. If the change is already implemented, reconstruct the expected
+  behavior from the original request and the design notes, not from the code.
+- Brief it with the expected behaviors only: user-facing outcomes,
+  constraints, and how to run the suite.
+- Bound the brief: signatures, spec, examples, and the style reference list.
+  A few tens of thousands of tokens at most. Do not attach files, folders or
+  diffs the test author does not need: every token sent to the test author is
+  billed at its full rate, and the test author needs almost none of it.
+- Never show it the implementation code, migrations, or internal design, and
+  forbid it explicitly, in the brief itself, from reading the application's
+  functional code on its own: a subagent that peeks at the implementation
+  writes tests that mirror it instead of pinning the agreed behavior.
+- To let it match the project's test style without losing impartiality, the
+  brief may list a small, explicit set of existing test files (paths only) it
+  is allowed to open as style references. Curate that list: only tests whose
+  conventions and assertions you trust, never a whole directory, and never a
+  file covering the very behavior under test. Open-ended sibling test
+  browsing stays forbidden.
+
+### The subagent
+
+- The subagent chooses its own assertions and structure, and runs its tests
+  itself.
+- Tests written before the implementation exists are expected to fail. The
+  subagent checks that each test fails for the right reason: the test runs,
+  reaches the behavior under test, and fails on the outcome, not on a syntax
+  or import error.
+- If a test fails, fix the implementation rather than rewriting the test,
+  unless the test contradicts the agreed spec.
+- Close the session as soon as its turn is over, and hand a review to a fresh
+  eye rather than to the author: see the delegation rule for the lifetime and
+  the brief.
+
+### After the suite is green
+
+Black box tests cannot see the cases only the implementation reveals: boundary
+conditions, degenerate paths, internal limits. After the suite passes, the
+review of the implementation diff may list missing cases of this kind. Feed
+each listed case back to the test subagent as a one shot brief containing the
+isolated case, the signature it concerns, and the expected outcome. The
+implementation itself stays out of the brief, and the review never edits the
+tests directly.
+
+### global/verification
+
+# Verification
+
+A change is not done because it looks done. It is done when it has been run.
+
+## Before saying it works
+
+- Run the narrowest check that covers the change: build, lint, test: the
+  project's own command, not a paraphrase of it.
+- Run the full suite before pushing, and never report green from a result you
+  did not just produce. "It should work" is not a result.
+- Report the real output when it matters: the passing count, the failing case
+  name, the error line. Not "the tests pass".
+- If a check cannot run here (no database, no network, no host access), say so,
+  and name the command the user must run instead. Never imply you ran it.
+
+## Before pushing: the recurring regressions
+
+Static analysis, when the project runs it, catches these; the checklist keeps
+them out of a push regardless, because the analytic runs after the review and
+these cost a round trip each. In new code, check for:
+
+- duplicated blocks above the duplication threshold the project sets;
+- a promise with no `await`, `.catch`, `.then` or explicit `void`;
+- nested ternaries that should be separate statements;
+- an `async` function with no `await` in it;
+- a generic `expect(value.length).toBe(n)` where a length matcher reports
+  better;
+- in container work, a tag combined with a digest in a `FROM` and an annotation
+  without its explicit target prefix.
+
+The checklist supplements, never replaces, whatever analysis the project runs.
+
+## When there is no test
+
+- Say it plainly: "there is no automated test covering this".
+- Do not invent a check and present it as coverage, and do not dress a manual
+  glance up as a suite.
+- Prefer a runnable check over prose: a command the user can paste beats a
+  paragraph explaining why it works. Writing the missing test is a separate,
+  visible change (see the testing rule).
+
+## Do not
+
+- Claim a fix without reproducing the bug first, or without saying you could not.
+- Silence a failure to keep the summary clean: a failing test, a warning, a
+  non-zero exit, a skipped check: report it, with its output.
+- Present a hypothesis as a fact: mark it, and name how to confirm it.
+
+### laravel/enforce-tests
+
+# Test enforcement
+
+- Pure copy, styling and layout-only changes do not require new or updated
+  tests.
+- Test the changed behavior and its important failure modes, but do not add
+  tests beyond them.
+- Read Boost's `testing-best-practices` skill when it is installed, else the
+  testing reference of the `engineering-standards` skill, before writing
+  tests.
+
+### laravel/engineering-standards
+
+# Engineering standards
+
+The mandatory workflow, architecture, security, testing and
+definition-of-done rules for this repository. These standards take
+precedence over any other guideline when they conflict.
+
+Detailed rationale, examples, anti-patterns and checklists for each area
+live in the `engineering-standards` skill: read the reference matching the
+area before working in it. Record consequential decisions as ADRs with
+`ibrain adr new <title>`.
+
+Path-scoped companions apply alongside this rule when editing in their
+area: `laravel/backend`, `laravel/database`, `laravel/api-contracts`,
+`laravel/frontend`.
+
+## Mission
+
+Build software that is correct, secure, maintainable, testable and
+operationally reliable.
+
+Optimize for long-term clarity and correctness, not merely for the fastest
+implementation.
+
+AI-generated code is not trusted by default. Understand, review and validate
+every change before considering it complete.
+
+## Mandatory workflow
+
+Before modifying code:
+
+1. Inspect the relevant existing code, project structure, dependencies and
+   tests.
+2. Identify the business requirement, constraints and acceptance criteria.
+3. Follow existing conventions unless there is a clear reason to improve
+   them.
+4. Identify security, data-integrity, concurrency and
+   backward-compatibility risks.
+5. Choose the smallest design that correctly addresses the requirement.
+
+During implementation:
+
+1. Keep changes focused and cohesive.
+2. Respect module boundaries and dependency direction.
+3. Reuse existing abstractions when appropriate.
+4. Avoid unnecessary abstractions, generic frameworks and speculative
+   extensibility.
+5. Never silently change business behavior or public API contracts.
+
+Before completion:
+
+1. Add or update meaningful automated tests.
+2. Run the relevant tests, static analysis, linters and build when
+   available.
+3. Review the final diff for correctness, security and unintended changes.
+4. Report the checks actually executed and their results.
+5. Explicitly disclose unverified assumptions, skipped checks and
+   remaining risks.
+
+Never claim that a test, build, migration or deployment succeeded unless it
+was actually verified.
+
+## Architecture
+
+- Organize code around cohesive responsibilities and, where useful,
+  business or functional domains.
+- Keep HTTP concerns, application orchestration, domain rules and
+  infrastructure concerns distinct when the complexity justifies those
+  boundaries.
+- Controllers should remain thin and should not become containers for all
+  business logic.
+- Use Actions, services, policies, requests, resources and jobs when they
+  clarify real responsibilities.
+- Define explicit contracts when consumers must remain independent of
+  interchangeable implementations.
+- Use dependency injection and the Laravel container to wire
+  implementations.
+- Keep dependencies directed toward stable contracts where appropriate.
+- Avoid circular dependencies and uncontrolled cross-module access.
+- Do not introduce a repository, factory, interface, event bus or
+  additional architectural layer without a concrete justification.
+- Prefer a well-structured modular monolith over premature microservices.
+
+## Domain modules
+
+A functional module may contain its contracts, implementations, application
+actions, integrations, validation adapters, configuration and tests.
+
+Keep related code together. Expose a small, intentional public interface and
+keep implementation details internal where practical.
+
+Before creating a module, determine whether its cohesion, complexity,
+variability or reuse justifies a separate boundary.
+
+Do not confuse a functional module with a strict Domain-Driven Design
+bounded context. Apply DDD patterns only when the business complexity
+benefits from them.
+
+## Interchangeable implementations
+
+When multiple providers or implementations must be interchangeable:
+
+1. Define the consumer-facing contract.
+2. Implement each provider behind that contract.
+3. Bind the selected implementation through configuration and dependency
+   injection.
+4. Keep provider-specific details inside the provider or its adapter.
+5. Define behavior for timeouts, invalid responses and provider failures.
+6. Test the contract against each implementation where practical.
+7. Use fakes or test doubles for deterministic automated tests.
+8. Never introduce an insecure fallback silently.
+
+Examples include CAPTCHA providers, payment gateways, storage backends,
+notification channels and external API clients.
+
+Do not create interchangeable abstractions merely because alternatives might
+exist someday.
+
+## Security
+
+- Enforce authorization on the server for every sensitive operation.
+- Prevent unauthorized access to another user's resources.
+- Validate inputs and constrain writable fields.
+- Consider SQL injection, XSS, CSRF, SSRF, unsafe file uploads, rate
+  limiting and secret exposure where relevant.
+- Use least-privilege access for application accounts and deployment
+  credentials.
+- Never log passwords, tokens or unnecessary sensitive data.
+- Treat external responses and user-provided content as untrusted.
+- Fail safely when a security-critical verification cannot be completed.
 
 ## Testing
 
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+Test behavior and business invariants, not merely implementation details.
 
-=== pint/core rules ===
+Prioritize:
 
-# Laravel Pint Code Formatter
+- Critical business rules.
+- Authorization and validation.
+- Failure paths and transaction integrity.
+- Concurrency and idempotency for sensitive operations.
+- API contracts and integration boundaries.
+- Important frontend interactions.
+- Regression tests for fixed bugs.
 
-- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
+Use unit, integration, feature and end-to-end tests at appropriate
+boundaries.
 
-=== pest/core rules ===
+Never weaken or remove a test solely to make an implementation pass.
+Investigate whether the test or implementation is wrong.
 
-# Pest
+## Quality and maintainability
 
-- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
-- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
-- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
-- Do not delete tests or test files without approval. They are part of the application.
+- Prefer readable, explicit code over cleverness.
+- Refactor incrementally and preserve behavior with tests.
+- Avoid premature abstraction, unnecessary indirection and speculative
+  generalization.
+- Remove dead code when safely within scope.
+- Keep changes focused and reviewable.
+- Document non-obvious business rules and consequential technical decisions.
 
-## Running Tests
+## Performance and operations
 
-- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
-- Rerun a test after each change to it.
-- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- Measure before optimizing.
+- Inspect database queries, application latency, resource use and frontend
+  bundle costs.
+- Introduce caching, queues or additional infrastructure only when
+  justified.
+- Provide useful logging and error diagnostics without leaking sensitive
+  data.
+- Make deployment, migrations, background jobs and rollback behavior
+  explicit.
+- Consider backups and restoration for applications with persistent data.
 
-</laravel-boost-guidelines>
+## Definition of done
+
+A change is complete only when:
+
+- Its requirements and relevant business rules are satisfied.
+- Security and data-integrity implications have been considered.
+- Appropriate tests have been added or updated.
+- Available quality checks have been run, or skipped checks have been
+  disclosed.
+- The change has been reviewed for unintended side effects.
+- Relevant documentation has been updated.
+- Remaining limitations and risks are explicitly stated.
+
+### product (from project:infinity-url)
+
+# Infinity URL
+
+Privacy-first URL shortener. The link domain is `iurl.fr`. The product belongs to
+Infinity Project.
+
+## Repositories
+
+| Repository | Contains | Stack |
+| --- | --- | --- |
+| `infinity-url-api` | Redirect route, REST API, analytics pipeline, jobs | Laravel 13, PHP 8.4, PostgreSQL 17, Valkey 8 |
+| `infinity-url` | Dashboard, marketing pages, QR rendering | Nuxt 4, Vue 3 |
+
+The dashboard is a client of the **public** API, exactly like `iQuiz` or a third
+party. There is no private endpoint reserved for the dashboard. If a screen needs
+a datum, the datum goes through the documented API.
+
+## Read the dossier before inventing anything
+
+`docs/` holds the design. It is not background reading, it is the specification:
+
+| File | Content |
+| --- | --- |
+| `01-decisions.md` | Every arbitrated decision, numbered `D-xx` |
+| `07-schema.md` | The database model, as SQL |
+| `10-api.md` | The HTTP contract |
+| `11-pipeline.md` | From a click to a counter |
+| `12-uml.md` | State machines and sequences |
+| `09-tests.md` | How this project is tested |
+| `08-setup.md` | Hosts, Traefik, compose, secrets, packages |
+
+If a task contradicts a decision, **stop and name the decision**. Do not
+implement a third option silently, and do not re-litigate a settled point.
+
+## What does not exist, and must not be added
+
+- Anonymous link creation.
+- A link-in-bio page.
+- Password-protected links (deferred).
+- Referer, user-agent or IP stored anywhere.
+- A click-level event table.
+- Billing, teams, roles beyond `owner`, SSO.
+- A third-party script on `iurl.fr`.
+- A session list exposed to the user.
+- A browser extension that observes navigation. A `302` with no body cannot host a
+  content script: detecting our redirects would require `webRequest` on every
+  site. Anonymous reporting already exists without an extension.
+
+Each of these is a product decision, not an implementation detail. Stop and ask.
+
+<!-- ibrain:end -->
