@@ -61,6 +61,8 @@ L'ordre est dicté par le risque, pas par la dépendance technique. **Les domain
 
 **Total : 137–192 h.** À 8–10 h par semaine : **3 à 4 mois**. Avec une marge de sécurité réaliste, compter 4 à 5 mois.
 
+Le rate limiting de la redirection et des 404 est assuré par **Traefik**, pas par l'application : aucun coût sur le chemin chaud, et aucune empreinte d'IP en base ni en cache applicatif. Il se configure à l'étape S3, avec le pipeline analytique.
+
 **Seul inconnu technique de S0** : le chargement du binaire `.wasm` sous Vite/Nuxt. Le paquet est construit avec `wasm-pack --target web`, ce qui exporte un module ESM dont la fonction `init()` doit être appelée avant usage, et dont le `.wasm` est résolu à l'exécution. C'est un détail de configuration Vite, pas un obstacle — mais c'est le genre de chose qui coûte une soirée si elle est découverte en S5. D'où le spike de 30 minutes en S0.
 
 Si le calendrier doit être tenu à 4 mois, la seule coupe acceptable est le **QR** (S5 partiel) : il est agréable mais ne conditionne ni l'inscription ni le paiement futur. Les domaines custom, eux, ne se coupent pas.

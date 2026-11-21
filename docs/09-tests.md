@@ -41,7 +41,9 @@ C'est la partie la plus importante du document. Ces tests ne testent pas du code
 | Aucun script sur `iurl.fr` | La redirection ne sert que des en-têtes, et les pages d'erreur ne contiennent ni `<script>`, ni ressource externe | `RedirectPrivacyTest` + `ErrorPagePrivacyTest` |
 | Clé non corrélable entre liens | Même IP + deux `link_id` → deux clés différentes | `tests/Unit/DedupKeyTest.php` |
 | Sel irrécupérable | Après rotation, l'ancien sel n'est plus accessible | `tests/Feature/SaltRotationTest.php` |
-| User-agent jamais persisté | Aucune colonne UA, aucun log applicatif contenant l'UA | `tests/Architecture/NoUserAgentTest.php` |
+| User-agent jamais persisté | Aucune colonne UA, aucun log applicatif contenant l'UA | `tests/Architecture/NoUserAgentTest.php` + `tests/Feature/RedirectLogPrivacyTest.php` |
+| Aucun referer | Introspection du schéma : aucune colonne `referer` ou `referrer` | `tests/Architecture/NoReferrerTest.php` |
+| Colonnes interdites absentes des migrations | Aucune migration ne contient `ip_address`, `user_agent`, `referer` ou `referrer` | `tests/Architecture/NoForbiddenMigrationTest.php` |
 | **Email jamais lisible en base** | `users.email` contient du ciphertext, jamais la valeur en clair | `tests/Feature/EmailEncryptionTest.php` |
 | **Hash d'index jamais exposé** | `email_hash` absent de toute réponse JSON et de tout payload | `tests/Feature/HashColumnsHiddenTest.php` |
 | **Rotation d'`APP_KEY` sans perte d'index** | Changer `app.key` ne modifie pas `EmailHasher::hash()` (clé dédiée) | `tests/Unit/BlindIndexKeyTest.php` |
@@ -56,7 +58,7 @@ Le test `NoIpColumnTest` est volontairement brutal : il échoue si quelqu'un ajo
 - **Auth** : inscription, vérification d'email, connexion, 2FA TOTP, réinitialisation, expiration de token.
 - **Tokens API** : création, scopes, rotation, révocation, hachage au repos.
 - **Liens** : création, validation, édition, suppression, expiration.
-- **Redirection** : `302`, cache chaud, cache froid, negative cache sur 404, `410` sur slug supprimé.
+- **Redirection** : `302`, cache chaud, cache froid, negative cache sur 404, `410` sur slug supprimé, TTL, singleflight, échec ouvert Valkey, `503` sur base froide indisponible, et invalidation à l'édition, au renommage, à la suppression et au blocage.
 - **Rate limiting** : dépassement, en-têtes `X-RateLimit-*`, 404 répétés.
 - **OpenAPI** : la spec générée est valide et contient toutes les routes publiques.
 
