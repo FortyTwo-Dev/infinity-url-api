@@ -10,7 +10,7 @@ use App\Models\User;
 
 final class TokenLocator
 {
-    public function __construct(private readonly TokenService $tokens) {}
+    public function __construct(private readonly ApiTokenService $tokens) {}
 
     public function for(User $user, int $id): PersonalAccessToken
     {

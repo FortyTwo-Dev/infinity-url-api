@@ -6,7 +6,7 @@ namespace App\Actions\Tokens;
 
 use App\Models\PersonalAccessToken;
 use App\Models\User;
-use App\Services\TokenService;
+use App\Services\ApiTokenService;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\NewAccessToken;
@@ -14,7 +14,7 @@ use Laravel\Sanctum\TransientToken;
 
 final class CreateApiToken
 {
-    public function __construct(private readonly TokenService $tokens) {}
+    public function __construct(private readonly ApiTokenService $tokens) {}
 
     /**
      * @param  list<string>  $scopes

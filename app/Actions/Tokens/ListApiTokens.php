@@ -6,14 +6,14 @@ namespace App\Actions\Tokens;
 
 use App\Models\PersonalAccessToken;
 use App\Models\User;
-use App\Services\TokenService;
+use App\Services\ApiTokenService;
 use App\Support\Cursor;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class ListApiTokens
 {
-    public function __construct(private readonly TokenService $tokens) {}
+    public function __construct(private readonly ApiTokenService $tokens) {}
 
     /**
      * @param  array<string, mixed>  $filters
