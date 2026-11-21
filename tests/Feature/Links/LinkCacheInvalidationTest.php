@@ -7,8 +7,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\LinkDomainSeeder;
 use Laravel\Sanctum\Sanctum;
-
-const LINK_CACHE_INVALIDATION_API = 'https://api.url.infinityproject.fr';
+use Tests\Support\Api;
 
 /**
  * @return array{0: Workspace, 1: Domain}
@@ -40,7 +39,7 @@ it('serves the new destination after an update', function () {
         ->assertStatus(302)
         ->assertHeader('Location', 'https://example.com/old');
 
-    $this->patchJson(LINK_CACHE_INVALIDATION_API.'/v1/links/'.$link->public_id, [
+    $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'destination' => 'https://example.com/new',
     ])->assertOk();
 
@@ -56,7 +55,7 @@ it('clears a warmed negative cache entry when the link is created', function () 
 
     $this->get('https://iurl.fr/'.$slug)->assertNotFound();
 
-    $this->postJson(LINK_CACHE_INVALIDATION_API.'/v1/links', [
+    $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/created',
         'slug' => $slug,
     ])->assertCreated();
@@ -78,7 +77,7 @@ it('invalidates both slugs when a link is renamed', function () {
     $this->get('https://iurl.fr/cacheold1')->assertStatus(302);
     $this->get('https://iurl.fr/cachenew1')->assertNotFound();
 
-    $this->patchJson(LINK_CACHE_INVALIDATION_API.'/v1/links/'.$link->public_id, [
+    $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'slug' => 'cachenew1',
     ])->assertOk();
 
@@ -99,7 +98,7 @@ it('answers 410 after a warmed link is deleted', function () {
 
     $this->get('https://iurl.fr/cachedele1')->assertStatus(302);
 
-    $this->deleteJson(LINK_CACHE_INVALIDATION_API.'/v1/links/'.$link->public_id)
+    $this->deleteJson(Api::LINKS.'/'.$link->public_id)
         ->assertNoContent();
 
     $this->get('https://iurl.fr/cachedele1')->assertStatus(410);

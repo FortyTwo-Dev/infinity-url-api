@@ -3,6 +3,9 @@
 use App\Mail\VerifyEmail;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\Api;
+
+const RESEND_EMAIL = 'resend@example.com';
 
 it('verifies an address from the emailed token and stays idempotent on replay', function () {
     Mail::fake();
@@ -12,7 +15,7 @@ it('verifies an address from the emailed token and stays idempotent on replay', 
     $this->requestVerification('verify@example.com');
     $token = $this->verificationToken();
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/verify-email', [
+    $response = $this->postJson(Api::VERIFY_EMAIL, [
         'token' => $token,
     ]);
 
@@ -20,7 +23,7 @@ it('verifies an address from the emailed token and stays idempotent on replay', 
     expect((string) $response->getContent())->toBe('');
     expect($user->fresh()->email_verified_at)->not->toBeNull();
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/verify-email', [
+    $this->postJson(Api::VERIFY_EMAIL, [
         'token' => $token,
     ])->assertStatus(200);
 
@@ -35,7 +38,7 @@ it('rejects a tampered verification token', function () {
     $this->requestVerification('tampered@example.com');
     $token = $this->verificationToken();
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/verify-email', [
+    $response = $this->postJson(Api::VERIFY_EMAIL, [
         'token' => $token.'x',
     ]);
 
@@ -54,7 +57,7 @@ it('rejects a verification token older than twenty-four hours', function () {
     try {
         $this->travel(25)->hours();
 
-        $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/verify-email', [
+        $response = $this->postJson(Api::VERIFY_EMAIL, [
             'token' => $token,
         ]);
 
@@ -69,11 +72,11 @@ it('rejects a verification token older than twenty-four hours', function () {
 it('resends a verification link to an unverified address', function () {
     Mail::fake();
 
-    User::factory()->unverified()->create(['email' => 'resend@example.com']);
+    User::factory()->unverified()->create(['email' => RESEND_EMAIL]);
 
-    $this->requestVerification('resend@example.com');
+    $this->requestVerification(RESEND_EMAIL);
 
-    Mail::assertSent(VerifyEmail::class, fn (VerifyEmail $mail): bool => $mail->hasTo('resend@example.com'));
+    Mail::assertSent(VerifyEmail::class, fn (VerifyEmail $mail): bool => $mail->hasTo(RESEND_EMAIL));
 });
 
 it('answers 202 without sending anything for an unknown or verified address', function () {

@@ -27,7 +27,7 @@ function slugGeneratorWithDraws(): SlugGenerator
 
     return new SlugGenerator(
         app(ReservedSlugs::class),
-        function (int $max) use (&$draws, &$position): int {
+        function () use (&$draws, &$position): int {
             return $draws[$position++] ?? 0;
         },
     );
@@ -64,7 +64,7 @@ it('maps every zero draw to aaaaaaa', function () {
 
     $generator = new SlugGenerator(
         app(ReservedSlugs::class),
-        fn (int $max): int => 0,
+        fn (): int => 0,
     );
 
     expect($generator->generate($domain))->toBe('aaaaaaa');

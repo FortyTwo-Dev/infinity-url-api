@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\Api;
 
 it('deletes the account, soft deletes it and revokes every token', function () {
     [, $user] = $this->account('delete@example.com');
@@ -19,7 +20,7 @@ it('deletes the account, soft deletes it and revokes every token', function () {
 
     $this->app['auth']->forgetGuards();
 
-    expect($this->withToken($token)->getJson('https://api.url.infinityproject.fr/v1/me')->status())->toBe(401);
+    expect($this->withToken($token)->getJson(Api::ME)->status())->toBe(401);
 });
 
 it('keeps the email occupied after a deletion', function () {
@@ -28,7 +29,7 @@ it('keeps the email occupied after a deletion', function () {
     $user = User::factory()->create(['email' => 'occupied@example.com']);
     $user->delete();
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', [
+    $this->postJson(Api::REGISTER, [
         'email' => 'occupied@example.com',
         'password' => 'correct horse battery',
     ])->assertStatus(201);
@@ -72,7 +73,7 @@ it('refuses the login after the grace period and purges the account with slug to
     try {
         $this->travel(31)->days();
 
-        $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
+        $this->postJson(Api::LOGIN, [
             'email' => 'purged@example.com',
             'password' => 'password',
         ])->assertStatus(401);

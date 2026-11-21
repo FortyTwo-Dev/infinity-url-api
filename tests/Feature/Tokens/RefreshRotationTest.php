@@ -1,9 +1,13 @@
 <?php
 
-it('rotates the refresh cookie and revokes the whole family when the old one is replayed', function () {
-    $this->account('rotate@example.com');
+use Tests\Support\Api;
 
-    $cookieA = $this->loginSession('rotate@example.com')->cookie;
+const ROTATE_EMAIL = 'rotate@example.com';
+
+it('rotates the refresh cookie and revokes the whole family when the old one is replayed', function () {
+    $this->account(ROTATE_EMAIL);
+
+    $cookieA = $this->loginSession(ROTATE_EMAIL)->cookie;
 
     $refreshed = $this->refreshWith($cookieA);
 
@@ -24,7 +28,7 @@ it('rotates the refresh cookie and revokes the whole family when the old one is 
 
     $this->refreshWith($cookieB)->assertStatus(401);
 
-    $cookieC = $this->loginSession('rotate@example.com')->cookie;
+    $cookieC = $this->loginSession(ROTATE_EMAIL)->cookie;
 
     $this->refreshWith($cookieC)->assertStatus(200);
 });
@@ -32,15 +36,15 @@ it('rotates the refresh cookie and revokes the whole family when the old one is 
 it('answers the same unauthorized code without a cookie and with an unknown cookie', function () {
     $this->withCredentials();
 
-    $missing = $this->postJson('https://api.url.infinityproject.fr/v1/auth/refresh');
+    $missing = $this->postJson(Api::REFRESH);
 
     $missing->assertStatus(401);
-    expect((string) $missing->headers->get('Content-Type'))->toStartWith('application/problem+json');
+    expect((string) $missing->headers->get('Content-Type'))->toStartWith(Api::PROBLEM_CONTENT_TYPE);
     $code = $missing->json('code');
     expect($code)->toBeIn(['token_revoked', 'unauthorized']);
 
     $random = $this->withRefreshCookie('not-a-real-refresh-token')
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh');
+        ->postJson(Api::REFRESH);
 
     $random->assertStatus(401);
     expect($random->json('code'))->toBe($code);
@@ -59,6 +63,6 @@ it('keeps a rotated family refreshing across several rotations', function () {
     }
 
     $this->withToken($refreshed->json('access_token'))
-        ->getJson('https://api.url.infinityproject.fr/v1/me')
+        ->getJson(Api::ME)
         ->assertStatus(200);
 });

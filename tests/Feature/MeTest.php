@@ -2,13 +2,14 @@
 
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Api;
 
 it('returns the account, its workspace, its limits and its capabilities', function () {
     [$workspace, $user] = $this->account('me@example.com', ['name' => 'My workspace']);
 
     Sanctum::actingAs($user, ['me:read']);
 
-    $response = $this->getJson('https://api.url.infinityproject.fr/v1/me');
+    $response = $this->getJson(Api::ME);
 
     $response->assertStatus(200);
 
@@ -48,7 +49,7 @@ it('returns the account, its workspace, its limits and its capabilities', functi
 });
 
 it('answers 401 without a token', function () {
-    $response = $this->getJson('https://api.url.infinityproject.fr/v1/me');
+    $response = $this->getJson(Api::ME);
 
     $this->assertProblem($response, 401, 'unauthorized');
     expect($response->json('instance'))->toBe('/v1/me');
@@ -59,7 +60,7 @@ it('answers 403 when the token lacks the me read ability', function () {
 
     Sanctum::actingAs($user, ['links:read']);
 
-    $response = $this->getJson('https://api.url.infinityproject.fr/v1/me');
+    $response = $this->getJson(Api::ME);
 
     $this->assertProblem($response, 403, 'scope_missing');
     expect($response->json('instance'))->toBe('/v1/me');

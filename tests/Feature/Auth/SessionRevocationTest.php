@@ -1,15 +1,19 @@
 <?php
 
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Api;
+
+const LOGOUT_EMAIL = 'logout@example.com';
+const LOGOUT_ALL_EMAIL = 'logoutall@example.com';
 
 it('revokes only the current refresh family on logout', function () {
-    $this->account('logout@example.com');
+    $this->account(LOGOUT_EMAIL);
 
-    $first = $this->loginSession('logout@example.com');
-    $second = $this->loginSession('logout@example.com');
+    $first = $this->loginSession(LOGOUT_EMAIL);
+    $second = $this->loginSession(LOGOUT_EMAIL);
 
     $logout = $this->withRefreshCookie($first->cookie)
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/logout');
+        ->postJson(Api::LOGOUT);
 
     $logout->assertStatus(204);
 
@@ -18,13 +22,13 @@ it('revokes only the current refresh family on logout', function () {
 });
 
 it('revokes every refresh family on logout-all', function () {
-    $this->account('logoutall@example.com');
+    $this->account(LOGOUT_ALL_EMAIL);
 
-    $first = $this->loginSession('logoutall@example.com');
-    $second = $this->loginSession('logoutall@example.com');
+    $first = $this->loginSession(LOGOUT_ALL_EMAIL);
+    $second = $this->loginSession(LOGOUT_ALL_EMAIL);
 
     $response = $this->withToken($first->accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/logout-all');
+        ->postJson(Api::LOGOUT_ALL);
 
     $response->assertStatus(204);
 
@@ -40,7 +44,7 @@ it('requires the me write ability to revoke every session', function () {
 
     Sanctum::actingAs($user, ['me:read']);
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/logout-all');
+    $response = $this->postJson(Api::LOGOUT_ALL);
 
     $this->assertProblem($response, 403, 'scope_missing');
 });

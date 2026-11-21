@@ -4,22 +4,25 @@ use App\Models\User;
 use App\Services\EmailHasher;
 use Tests\TestCase;
 
+const ENCRYPTED_HASH_EMAIL = 'user@example.com';
+const ENCRYPTED_HASH_SECOND_EMAIL = 'second@example.com';
+
 uses(TestCase::class);
 
 it('writes a ciphertext and the blind index when an email is set', function () {
     $user = new User;
-    $user->email = 'user@example.com';
+    $user->email = ENCRYPTED_HASH_EMAIL;
 
     $attributes = $user->getAttributes();
 
-    expect($attributes['email'])->not->toBe('user@example.com')
-        ->and($attributes['email_hash'])->toBe(app(EmailHasher::class)->hash('user@example.com'))
-        ->and($user->email)->toBe('user@example.com');
+    expect($attributes['email'])->not->toBe(ENCRYPTED_HASH_EMAIL)
+        ->and($attributes['email_hash'])->toBe(app(EmailHasher::class)->hash(ENCRYPTED_HASH_EMAIL))
+        ->and($user->email)->toBe(ENCRYPTED_HASH_EMAIL);
 });
 
 it('does not rewrite the ciphertext when the same email is set again', function () {
     $user = new User;
-    $user->email = 'user@example.com';
+    $user->email = ENCRYPTED_HASH_EMAIL;
     $user->syncOriginal();
 
     $ciphertext = $user->getAttributes()['email'];
@@ -40,17 +43,17 @@ it('changes both the ciphertext and the hash for a different email', function ()
     $ciphertext = $user->getAttributes()['email'];
     $hash = $user->getAttributes()['email_hash'];
 
-    $user->email = 'second@example.com';
+    $user->email = ENCRYPTED_HASH_SECOND_EMAIL;
 
     expect($user->getAttributes()['email'])->not->toBe($ciphertext)
         ->and($user->getAttributes()['email_hash'])->not->toBe($hash)
-        ->and($user->getAttributes()['email_hash'])->toBe(app(EmailHasher::class)->hash('second@example.com'))
-        ->and($user->email)->toBe('second@example.com');
+        ->and($user->getAttributes()['email_hash'])->toBe(app(EmailHasher::class)->hash(ENCRYPTED_HASH_SECOND_EMAIL))
+        ->and($user->email)->toBe(ENCRYPTED_HASH_SECOND_EMAIL);
 });
 
 it('writes null for the ciphertext and the hash when the email is null', function () {
     $user = new User;
-    $user->email = 'user@example.com';
+    $user->email = ENCRYPTED_HASH_EMAIL;
 
     $user->email = null;
 

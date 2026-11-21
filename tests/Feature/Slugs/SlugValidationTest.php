@@ -6,8 +6,7 @@ use App\Services\SlugRules;
 use Database\Seeders\LinkDomainSeeder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
-
-const SLUG_VALIDATION_API = 'https://api.url.infinityproject.fr';
+use Tests\Support\Api;
 
 function slugValidationWorkspace(): Workspace
 {
@@ -48,7 +47,7 @@ it('rejects separators, spaces and non-ascii characters', function () {
 it('stores and returns a custom slug in lowercase', function () {
     slugValidationWorkspace();
 
-    $response = $this->postJson(SLUG_VALIDATION_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/promo',
         'slug' => 'PrOmO',
     ]);
@@ -65,7 +64,7 @@ it('stores and returns a custom slug in lowercase', function () {
 it('rejects a one-character slug', function () {
     slugValidationWorkspace();
 
-    $response = $this->postJson(SLUG_VALIDATION_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/too-short',
         'slug' => 'a',
     ]);
@@ -73,14 +72,14 @@ it('rejects a one-character slug', function () {
     $response->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json')
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE)
         ->and($response->json('errors.slug'))->not->toBeEmpty();
 });
 
 it('rejects a slug containing a space', function () {
     slugValidationWorkspace();
 
-    $response = $this->postJson(SLUG_VALIDATION_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/space',
         'slug' => 'has space',
     ]);
@@ -88,6 +87,6 @@ it('rejects a slug containing a space', function () {
     $response->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json')
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE)
         ->and($response->json('errors.slug'))->not->toBeEmpty();
 });

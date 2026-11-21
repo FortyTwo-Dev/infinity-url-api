@@ -1,232 +1,16 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Process\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Process;
+use Tests\Support\Api;
+use Tests\Support\ProbeRunner;
 
-/**
- * Why the configuration guard exists: a spawned probe boots the application in
- * its own process. If `config:cache` is in place, the child would read the
- * cached configuration (possibly the development database) and ignore the
- * environment passed below. In that case the test is skipped instead of
- * touching anything outside the test database.
- */
-function concurrentProbesUnavailableReason(): ?string
-{
-    if (! function_exists('proc_open')) {
-        return 'proc_open is disabled, so parallel PHP processes cannot be started.';
-    }
-
-    if (file_exists(app()->getCachedConfigPath())) {
-        return 'The configuration is cached; a spawned probe could boot against a stale environment.';
-    }
-
-    return null;
-}
-
-/**
- * Run HTTP requests in parallel PHP processes, each booting the application and
- * dispatching a real kernel request against the test database and Valkey.
- *
- * Every probe bootstraps the application, announces readiness, then waits for
- * one common release file so the requests are dispatched inside the same
- * window. The barrier directory is pinned through the child environment.
- *
- * @param  list<array{method?: string, url: string, body?: array<string, mixed>, cookies?: array<string, string>, headers?: array<string, string>}>  $requests
- * @return list<array{status: int, body: mixed, cookie: ?string}>
- */
-function runConcurrentAuthRequests(array $requests): array
-{
-    $barrier = sys_get_temp_dir().'/iurl_barrier_'.bin2hex(random_bytes(8));
-
-    if (! mkdir($barrier, 0700)) {
-        throw new RuntimeException('Could not create the probe barrier directory: '.$barrier);
-    }
-
-    $script = $barrier.'/probe.php';
-
-    file_put_contents($script, <<<'PHP'
-<?php
-
-$id = $argv[1];
-$base = $argv[2];
-$method = $argv[3];
-$url = $argv[4];
-$body = $argv[5];
-$cookies = $argv[6];
-$headers = $argv[7];
-
-$barrier = (string) getenv('IURL_PROBE_BARRIER');
-
-require $base.'/vendor/autoload.php';
-
-$app = require $base.'/bootstrap/app.php';
-
-$kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
-
-$kernel->bootstrap();
-
-$request = Illuminate\Http\Request::create(
-    $url,
-    $method,
-    [],
-    json_decode($cookies, true) ?: [],
-    [],
-    [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_ACCEPT' => 'application/json',
-    ],
-    $body,
-);
-
-foreach (json_decode($headers, true) ?: [] as $name => $value) {
-    $request->headers->set($name, $value);
-}
-
-// The application is booted: announce it, then wait for the common release so
-// every probe dispatches inside the same window.
-touch($barrier.'/ready-'.$id);
-
-$deadline = microtime(true) + 30;
-
-while (! is_file($barrier.'/release')) {
-    if (microtime(true) > $deadline) {
-        fwrite(STDERR, 'probe '.$id.' timed out waiting for the release');
-
-        exit(1);
-    }
-
-    usleep(2000);
-}
-
-$response = $kernel->handle($request);
-$kernel->terminate($request, $response);
-
-$refresh = null;
-
-foreach ($response->headers->getCookies() as $cookie) {
-    if ($cookie->getName() === '__Host-iurl_refresh') {
-        $refresh = $cookie->getValue();
-    }
-}
-
-echo json_encode([
-    'status' => $response->getStatusCode(),
-    'body' => json_decode((string) $response->getContent(), true),
-    'cookie' => $refresh,
-]);
-PHP);
-
-    $connection = config('database.connections.'.config('database.default'));
-    $redis = config('database.redis.default');
-
-    $environment = [
-        'APP_ENV' => 'testing',
-        'APP_KEY' => (string) config('app.key'),
-        'BLIND_INDEX_KEY' => (string) config('identity.blind_index_key'),
-        'DB_CONNECTION' => (string) config('database.default'),
-        'DB_DATABASE' => (string) $connection['database'],
-        'DB_HOST' => (string) $connection['host'],
-        'DB_PORT' => (string) $connection['port'],
-        'DB_USERNAME' => (string) $connection['username'],
-        'DB_PASSWORD' => (string) $connection['password'],
-        'CACHE_STORE' => (string) config('cache.default'),
-        'REDIS_CLIENT' => (string) config('database.redis.client'),
-        'REDIS_HOST' => (string) $redis['host'],
-        'REDIS_PORT' => (string) $redis['port'],
-        'REDIS_DB' => (string) $redis['database'],
-        'REDIS_CACHE_DB' => (string) config('database.redis.cache.database'),
-        'MAIL_MAILER' => 'array',
-        'QUEUE_CONNECTION' => 'sync',
-        'SESSION_DRIVER' => 'array',
-        'IURL_PROBE_BARRIER' => $barrier,
-    ];
-
-    try {
-        $commands = [];
-
-        foreach ($requests as $index => $request) {
-            $commands[] = [
-                PHP_BINARY,
-                $script,
-                (string) $index,
-                base_path(),
-                $request['method'] ?? 'POST',
-                $request['url'],
-                json_encode($request['body'] ?? []),
-                json_encode($request['cookies'] ?? []),
-                json_encode($request['headers'] ?? []),
-            ];
-        }
-
-        $invoked = Process::pool(function (Pool $pool) use ($commands, $environment): void {
-            foreach ($commands as $command) {
-                $pool->path(base_path())->timeout(60)->env($environment)->command($command);
-            }
-        })->start();
-
-        $deadline = microtime(true) + 30;
-
-        foreach (array_keys($requests) as $index) {
-            $ready = $barrier.'/ready-'.$index;
-
-            while (! is_file($ready)) {
-                if ($invoked->running()->isEmpty()) {
-                    touch($barrier.'/release');
-
-                    $failures = collect($invoked->wait())->map->errorOutput()->implode("\n");
-
-                    throw new RuntimeException('A probe exited before signalling readiness: '.$failures);
-                }
-
-                if (microtime(true) > $deadline) {
-                    touch($barrier.'/release');
-
-                    throw new RuntimeException('Probe '.$index.' never signalled readiness.');
-                }
-
-                usleep(2000);
-            }
-        }
-
-        // Every probe is booted and parked: release them together.
-        $ready = glob($barrier.'/ready-*') ?: [];
-
-        if (count($ready) !== count($requests)) {
-            touch($barrier.'/release');
-
-            throw new RuntimeException('The barrier did not see every probe become ready: '.implode(', ', $ready));
-        }
-
-        touch($barrier.'/release');
-
-        return collect($invoked->wait())->map(function ($result): array {
-            if ($result->exitCode() !== 0) {
-                throw new RuntimeException('Parallel probe failed: '.$result->errorOutput().$result->output());
-            }
-
-            $decoded = json_decode($result->output(), true);
-
-            if (! is_array($decoded)) {
-                throw new RuntimeException('Parallel probe returned no decodable payload: '.$result->output());
-            }
-
-            return $decoded;
-        })->all();
-    } finally {
-        foreach (glob($barrier.'/*') ?: [] as $file) {
-            @unlink($file);
-        }
-
-        @rmdir($barrier);
-    }
-}
+const CONCURRENT_RESET_EMAIL = 'concurrent-reset@example.com';
 
 it('lets exactly one of two simultaneous refresh attempts rotate the cookie', function () {
-    if ($reason = concurrentProbesUnavailableReason()) {
+    if ($reason = ProbeRunner::unavailableReason()) {
         $this->markTestSkipped($reason);
     }
 
@@ -234,13 +18,13 @@ it('lets exactly one of two simultaneous refresh attempts rotate the cookie', fu
 
     $cookie = $this->loginSession('concurrent-refresh@example.com')->cookie;
 
-    $results = runConcurrentAuthRequests([
+    $results = ProbeRunner::run([
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/refresh',
+            'url' => Api::REFRESH,
             'cookies' => ['__Host-iurl_refresh' => $cookie],
         ],
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/refresh',
+            'url' => Api::REFRESH,
             'cookies' => ['__Host-iurl_refresh' => $cookie],
         ],
     ]);
@@ -258,13 +42,11 @@ it('lets exactly one of two simultaneous refresh attempts rotate the cookie', fu
     expect($winner['cookie'])->toBeString()->not->toBe('');
 
     // The replay revoked the whole family, including the token the winner got.
-    $this->withRefreshCookie($winner['cookie'])
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh')
-        ->assertStatus(401);
+    $this->refreshWith($winner['cookie'])->assertStatus(401);
 });
 
 it('lets exactly one of two simultaneous totp verifications consume the code', function () {
-    if ($reason = concurrentProbesUnavailableReason()) {
+    if ($reason = ProbeRunner::unavailableReason()) {
         $this->markTestSkipped($reason);
     }
 
@@ -273,13 +55,13 @@ it('lets exactly one of two simultaneous totp verifications consume the code', f
     $challenge = $this->challenge('concurrent-totp@example.com');
     $code = $this->totpCode($secret);
 
-    $results = runConcurrentAuthRequests([
+    $results = ProbeRunner::run([
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/2fa/verify',
+            'url' => Api::TWO_FACTOR_VERIFY,
             'body' => ['challenge' => $challenge, 'code' => $code],
         ],
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/2fa/verify',
+            'url' => Api::TWO_FACTOR_VERIFY,
             'body' => ['challenge' => $challenge, 'code' => $code],
         ],
     ]);
@@ -302,23 +84,23 @@ it('lets exactly one of two simultaneous totp verifications consume the code', f
 });
 
 it('lets exactly one of two simultaneous password resets consume the token', function () {
-    if ($reason = concurrentProbesUnavailableReason()) {
+    if ($reason = ProbeRunner::unavailableReason()) {
         $this->markTestSkipped($reason);
     }
 
     Mail::fake();
 
-    $user = $this->account('concurrent-reset@example.com')[1];
-    $this->requestReset('concurrent-reset@example.com');
+    $user = $this->account(CONCURRENT_RESET_EMAIL)[1];
+    $this->requestReset(CONCURRENT_RESET_EMAIL);
     $token = $this->resetToken();
 
-    $results = runConcurrentAuthRequests([
+    $results = ProbeRunner::run([
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/password/reset',
+            'url' => Api::PASSWORD_RESET,
             'body' => ['token' => $token, 'password' => 'concurrent password one'],
         ],
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/password/reset',
+            'url' => Api::PASSWORD_RESET,
             'body' => ['token' => $token, 'password' => 'concurrent password two'],
         ],
     ]);
@@ -332,13 +114,13 @@ it('lets exactly one of two simultaneous password resets consume the token', fun
     expect($loser['body']['code'])->toBe('validation_failed');
     expect($loser['body']['errors'])->toHaveKey('token');
 
-    $one = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'concurrent-reset@example.com',
+    $one = $this->postJson(Api::LOGIN, [
+        'email' => CONCURRENT_RESET_EMAIL,
         'password' => 'concurrent password one',
     ])->status();
 
-    $two = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'concurrent-reset@example.com',
+    $two = $this->postJson(Api::LOGIN, [
+        'email' => CONCURRENT_RESET_EMAIL,
         'password' => 'concurrent password two',
     ])->status();
 
@@ -346,7 +128,7 @@ it('lets exactly one of two simultaneous password resets consume the token', fun
     sort($logins);
     expect($logins)->toBe([200, 401]);
 
-    $replay = $this->postJson('https://api.url.infinityproject.fr/v1/auth/password/reset', [
+    $replay = $this->postJson(Api::PASSWORD_RESET, [
         'token' => $token,
         'password' => 'concurrent password three',
     ]);
@@ -359,7 +141,7 @@ it('lets exactly one of two simultaneous password resets consume the token', fun
 });
 
 it('answers token_revoked for two consumed cookies of the same family replayed in parallel', function () {
-    if ($reason = concurrentProbesUnavailableReason()) {
+    if ($reason = ProbeRunner::unavailableReason()) {
         $this->markTestSkipped($reason);
     }
 
@@ -374,13 +156,13 @@ it('answers token_revoked for two consumed cookies of the same family replayed i
     $second->assertStatus(200);
     $cookieC = $second->getCookie('__Host-iurl_refresh', false)->getValue();
 
-    $results = runConcurrentAuthRequests([
+    $results = ProbeRunner::run([
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/refresh',
+            'url' => Api::REFRESH,
             'cookies' => ['__Host-iurl_refresh' => $cookieA],
         ],
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/refresh',
+            'url' => Api::REFRESH,
             'cookies' => ['__Host-iurl_refresh' => $cookieB],
         ],
     ]);
@@ -396,13 +178,11 @@ it('answers token_revoked for two consumed cookies of the same family replayed i
 
     // Both consumed tokens were replayed, so the third (still active) token of
     // the family must be dead as well.
-    $this->withUnencryptedCookie('__Host-iurl_refresh', $cookieC)
-        ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh')
-        ->assertStatus(401);
+    $this->refreshWith($cookieC)->assertStatus(401);
 });
 
 it('serialises a concurrent 2fa disable and login verification on the same step', function () {
-    if ($reason = concurrentProbesUnavailableReason()) {
+    if ($reason = ProbeRunner::unavailableReason()) {
         $this->markTestSkipped($reason);
     }
 
@@ -413,14 +193,14 @@ it('serialises a concurrent 2fa disable and login verification on the same step'
     $challenge = $this->challenge('concurrent-disable@example.com');
     $code = $this->totpCode($secret);
 
-    $results = runConcurrentAuthRequests([
+    $results = ProbeRunner::run([
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/2fa/disable',
+            'url' => Api::TWO_FACTOR_DISABLE,
             'headers' => ['Authorization' => 'Bearer '.$access],
             'body' => ['password' => 'password', 'code' => $code],
         ],
         [
-            'url' => 'https://api.url.infinityproject.fr/v1/auth/2fa/verify',
+            'url' => Api::TWO_FACTOR_VERIFY,
             'body' => ['challenge' => $challenge, 'code' => $code],
         ],
     ]);

@@ -1,12 +1,14 @@
 <?php
 
+use Tests\Support\Api;
+
 it('creates an api token, shows the secret once and enforces its scopes', function () {
     $this->account('token@example.com');
 
     $accessToken = $this->loginSession('token@example.com')->accessToken;
 
     $response = $this->withToken($accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'iQuiz',
             'scopes' => ['links:read'],
         ]);
@@ -30,11 +32,11 @@ it('creates an api token, shows the secret once and enforces its scopes', functi
     $this->app['auth']->forgetGuards();
 
     $this->withToken($secret)
-        ->getJson('https://api.url.infinityproject.fr/v1/links')
+        ->getJson(Api::LINKS)
         ->assertStatus(200);
 
     $forbidden = $this->withToken($secret)
-        ->postJson('https://api.url.infinityproject.fr/v1/links', [
+        ->postJson(Api::LINKS, [
             'destination' => 'https://example.com/from-a-read-only-token',
         ]);
 
@@ -47,7 +49,7 @@ it('never returns the secret from the token list and hides dashboard sessions', 
     $accessToken = $this->loginSession('list@example.com')->accessToken;
 
     $this->withToken($accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'iQuiz',
             'scopes' => ['links:read', 'links:write'],
         ])
@@ -55,7 +57,7 @@ it('never returns the secret from the token list and hides dashboard sessions', 
 
     $this->app['auth']->forgetGuards();
 
-    $response = $this->withToken($accessToken)->getJson('https://api.url.infinityproject.fr/v1/tokens');
+    $response = $this->withToken($accessToken)->getJson(Api::TOKENS);
 
     $response->assertStatus(200);
     expect(array_keys($response->json()))->toEqualCanonicalizing(['data', 'next_cursor', 'has_more']);
@@ -79,7 +81,7 @@ it('rejects wildcard, me write and unknown scopes', function () {
 
     foreach ([['*'], ['me:write'], ['unknown:read']] as $scopes) {
         $response = $this->withToken($accessToken)
-            ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+            ->postJson(Api::TOKENS, [
                 'name' => 'rejected',
                 'scopes' => $scopes,
             ]);
@@ -95,7 +97,7 @@ it('refuses to grant a scope the minting token does not hold', function () {
     $accessToken = $this->loginSession('escalate@example.com')->accessToken;
 
     $lower = $this->withToken($accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'iQuiz',
             'scopes' => ['links:read', 'tokens:write'],
         ]);
@@ -104,7 +106,7 @@ it('refuses to grant a scope the minting token does not hold', function () {
     $this->app['auth']->forgetGuards();
 
     $attempt = $this->withToken($lower->json('token'))
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'escalated',
             'scopes' => ['links:write'],
         ]);
@@ -114,7 +116,7 @@ it('refuses to grant a scope the minting token does not hold', function () {
     $this->app['auth']->forgetGuards();
 
     $dashboard = $this->withToken($accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'writer',
             'scopes' => ['links:write'],
         ]);
@@ -130,7 +132,7 @@ it('revokes a token and answers 404 for another users token', function () {
     $accessToken = $this->loginSession('revoke@example.com')->accessToken;
 
     $created = $this->withToken($accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'revoked',
             'scopes' => ['links:read'],
         ]);
@@ -140,19 +142,19 @@ it('revokes a token and answers 404 for another users token', function () {
     $secret = $created->json('token');
 
     $this->withToken($accessToken)
-        ->deleteJson('https://api.url.infinityproject.fr/v1/tokens/'.$id)
+        ->deleteJson(Api::TOKENS.'/'.$id)
         ->assertStatus(204);
 
     $this->app['auth']->forgetGuards();
 
-    expect($this->withToken($secret)->getJson('https://api.url.infinityproject.fr/v1/links')->status())->toBe(401);
+    expect($this->withToken($secret)->getJson(Api::LINKS)->status())->toBe(401);
 
     $foreign = $other->createToken('foreign', ['links:read'])->accessToken;
 
     $this->app['auth']->forgetGuards();
 
     $response = $this->withToken($accessToken)
-        ->deleteJson('https://api.url.infinityproject.fr/v1/tokens/'.$foreign->id);
+        ->deleteJson(Api::TOKENS.'/'.$foreign->id);
 
     $this->assertProblem($response, 404, 'not_found');
 });
@@ -163,7 +165,7 @@ it('requires the tokens read ability to list tokens', function () {
     $accessToken = $this->loginSession('noread@example.com')->accessToken;
 
     $created = $this->withToken($accessToken)
-        ->postJson('https://api.url.infinityproject.fr/v1/tokens', [
+        ->postJson(Api::TOKENS, [
             'name' => 'no-token-read',
             'scopes' => ['links:read'],
         ]);
@@ -172,7 +174,7 @@ it('requires the tokens read ability to list tokens', function () {
     $this->app['auth']->forgetGuards();
 
     $response = $this->withToken($created->json('token'))
-        ->getJson('https://api.url.infinityproject.fr/v1/tokens');
+        ->getJson(Api::TOKENS);
 
     $this->assertProblem($response, 403, 'scope_missing');
 });

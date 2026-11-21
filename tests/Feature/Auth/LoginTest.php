@@ -1,9 +1,15 @@
 <?php
 
-it('logs in with an access token and a secure refresh cookie', function () {
-    [, $user] = $this->account('login@example.com');
+use Tests\Support\Api;
 
-    $response = $this->login('login@example.com');
+const LOGIN_EMAIL = 'login@example.com';
+const BEARER_EMAIL = 'bearer@example.com';
+const TWO_FACTOR_EMAIL = 'twofactor@example.com';
+
+it('logs in with an access token and a secure refresh cookie', function () {
+    [, $user] = $this->account(LOGIN_EMAIL);
+
+    $response = $this->login(LOGIN_EMAIL);
 
     $body = $response->json();
     expect(array_keys($body))->toEqualCanonicalizing(['access_token', 'token_type', 'expires_in', 'user']);
@@ -13,7 +19,7 @@ it('logs in with an access token and a secure refresh cookie', function () {
 
     expect(array_keys($body['user']))->toEqualCanonicalizing(['id', 'email', 'email_verified', 'totp_enabled']);
     expect($body['user']['id'])->toBe($user->public_id);
-    expect($body['user']['email'])->toBe('login@example.com');
+    expect($body['user']['email'])->toBe(LOGIN_EMAIL);
     expect($body['user']['email_verified'])->toBeTrue();
     expect($body['user']['totp_enabled'])->toBeFalse();
 
@@ -31,12 +37,12 @@ it('logs in with an access token and a secure refresh cookie', function () {
 it('answers the same unauthorized problem for a wrong password and an unknown address', function () {
     $this->account('victim@example.com');
 
-    $wrongPassword = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
+    $wrongPassword = $this->postJson(Api::LOGIN, [
         'email' => 'victim@example.com',
         'password' => 'not-the-password',
     ]);
 
-    $unknownEmail = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
+    $unknownEmail = $this->postJson(Api::LOGIN, [
         'email' => 'nobody@example.com',
         'password' => 'not-the-password',
     ]);
@@ -50,24 +56,24 @@ it('answers the same unauthorized problem for a wrong password and an unknown ad
 });
 
 it('accepts the access token on me and rejects the refresh token as a bearer', function () {
-    $this->account('bearer@example.com');
+    $this->account(BEARER_EMAIL);
 
-    $session = $this->loginSession('bearer@example.com');
+    $session = $this->loginSession(BEARER_EMAIL);
 
-    $me = $this->withToken($session->accessToken)->getJson('https://api.url.infinityproject.fr/v1/me');
+    $me = $this->withToken($session->accessToken)->getJson(Api::ME);
     $me->assertStatus(200);
-    expect($me->json('user.email'))->toBe('bearer@example.com');
+    expect($me->json('user.email'))->toBe(BEARER_EMAIL);
 
     $this->app['auth']->forgetGuards();
 
     $rejected = $this->withToken((string) $session->cookie)
-        ->getJson('https://api.url.infinityproject.fr/v1/me');
+        ->getJson(Api::ME);
     expect($rejected->status())->toBeIn([401, 403]);
     expect($rejected->json('user'))->toBeNull();
 });
 
 it('asks for a totp challenge before issuing a session', function () {
-    [, $user] = $this->account('twofactor@example.com');
+    [, $user] = $this->account(TWO_FACTOR_EMAIL);
 
     $enable = $this->enableTotp($user);
     $secret = $enable->json('secret');
@@ -81,8 +87,8 @@ it('asks for a totp challenge before issuing a session', function () {
 
     $this->app['auth']->forgetGuards();
 
-    $login = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
-        'email' => 'twofactor@example.com',
+    $login = $this->postJson(Api::LOGIN, [
+        'email' => TWO_FACTOR_EMAIL,
         'password' => 'password',
     ]);
 
@@ -95,7 +101,7 @@ it('asks for a totp challenge before issuing a session', function () {
 
     $challenge = $login->json('challenge');
 
-    $verified = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
+    $verified = $this->postJson(Api::TWO_FACTOR_VERIFY, [
         'challenge' => $challenge,
         'code' => $code,
     ]);
@@ -104,10 +110,10 @@ it('asks for a totp challenge before issuing a session', function () {
     expect($verified->json('access_token'))->toBeString()->not->toBe('');
     expect($verified->json('token_type'))->toBe('Bearer');
     expect($verified->json('expires_in'))->toBe(900);
-    expect($verified->json('user.email'))->toBe('twofactor@example.com');
+    expect($verified->json('user.email'))->toBe(TWO_FACTOR_EMAIL);
     expect($verified->getCookie('__Host-iurl_refresh', false))->not->toBeNull();
 
-    $replay = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/verify', [
+    $replay = $this->postJson(Api::TWO_FACTOR_VERIFY, [
         'challenge' => $challenge,
         'code' => $code,
     ]);

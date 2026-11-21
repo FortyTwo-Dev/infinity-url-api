@@ -8,8 +8,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\LinkDomainSeeder;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
-
-const LINK_CRUD_API = 'https://api.url.infinityproject.fr';
+use Tests\Support\Api;
 
 /**
  * @return array{0: Workspace, 1: User, 2: Domain}
@@ -31,7 +30,7 @@ function linkCrudFixture(): array
 it('creates a link from a destination alone', function () {
     linkCrudFixture();
 
-    $response = $this->postJson(LINK_CRUD_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/page',
     ]);
 
@@ -52,7 +51,7 @@ it('echoes a custom slug and a future expiration', function () {
 
     $expiresAt = now()->addDays(2)->startOfSecond();
 
-    $response = $this->postJson(LINK_CRUD_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/custom',
         'slug' => '  Custom-Slug ',
         'expires_at' => $expiresAt->toIso8601String(),
@@ -69,7 +68,7 @@ it('echoes a custom slug and a future expiration', function () {
 it('rejects an expiration in the past', function () {
     linkCrudFixture();
 
-    $response = $this->postJson(LINK_CRUD_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/past',
         'expires_at' => now()->subMinute()->toIso8601String(),
     ]);
@@ -77,7 +76,7 @@ it('rejects an expiration in the past', function () {
     $response->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json')
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE)
         ->and($response->json('errors.expires_at'))->not->toBeEmpty();
 });
 
@@ -89,14 +88,14 @@ dataset('invalid destinations', [
 it('rejects a destination that is not plain http or https', function (string $destination) {
     linkCrudFixture();
 
-    $response = $this->postJson(LINK_CRUD_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => $destination,
     ]);
 
     $response->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json')
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE)
         ->and($response->json('errors.destination'))->not->toBeEmpty();
 })->with('invalid destinations');
 
@@ -108,14 +107,14 @@ it('refuses link creation for an unverified account', function () {
     $workspace->members()->attach($unverified->id, ['role' => 'owner']);
     Sanctum::actingAs($unverified, ['links:write']);
 
-    $response = $this->postJson(LINK_CRUD_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/unverified',
     ]);
 
     $response->assertStatus(403)
         ->assertJsonPath('code', 'email_unverified');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json');
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE);
 });
 
 it('lists links newest first and paginates without duplicates', function () {
@@ -137,7 +136,7 @@ it('lists links newest first and paginates without duplicates', function () {
         'created_at' => now()->subMinute(),
     ]);
 
-    $response = $this->getJson(LINK_CRUD_API.'/v1/links');
+    $response = $this->getJson(Api::LINKS);
 
     $response->assertOk()
         ->assertJsonPath('has_more', false)
@@ -146,14 +145,14 @@ it('lists links newest first and paginates without duplicates', function () {
     expect(collect($response->json('data'))->pluck('id')->all())
         ->toBe([$newest->public_id, $middle->public_id, $oldest->public_id]);
 
-    $first = $this->getJson(LINK_CRUD_API.'/v1/links?limit=2');
+    $first = $this->getJson(Api::LINKS.'?limit=2');
     $first->assertOk()->assertJsonPath('has_more', true);
 
     $cursor = $first->json('next_cursor');
 
     expect($cursor)->toBeString()->not->toBeEmpty();
 
-    $second = $this->getJson(LINK_CRUD_API.'/v1/links?'.http_build_query([
+    $second = $this->getJson(Api::LINKS.'?'.http_build_query([
         'limit' => 2,
         'cursor' => $cursor,
     ]));
@@ -179,17 +178,17 @@ it('defaults to twenty items and validates the limit bounds', function () {
         ]);
     }
 
-    $response = $this->getJson(LINK_CRUD_API.'/v1/links');
+    $response = $this->getJson(Api::LINKS);
     $response->assertOk();
 
     expect($response->json('data'))->toHaveCount(20)
         ->and($response->json('has_more'))->toBeTrue();
 
-    $this->getJson(LINK_CRUD_API.'/v1/links?limit=0')
+    $this->getJson(Api::LINKS.'?limit=0')
         ->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
 
-    $this->getJson(LINK_CRUD_API.'/v1/links?limit=101')
+    $this->getJson(Api::LINKS.'?limit=101')
         ->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
 });
@@ -231,21 +230,21 @@ it('filters the list by status, domain and query', function () {
         return collect($response->json('data'))->pluck('slug')->all();
     };
 
-    expect($slugs($this->getJson(LINK_CRUD_API.'/v1/links?status=disabled')->assertOk()))
+    expect($slugs($this->getJson(Api::LINKS.'?status=disabled')->assertOk()))
         ->toBe(['filteroff']);
 
-    $onSystemDomain = $slugs($this->getJson(LINK_CRUD_API.'/v1/links?domain=iurl.fr')->assertOk());
+    $onSystemDomain = $slugs($this->getJson(Api::LINKS.'?domain=iurl.fr')->assertOk());
 
     expect($onSystemDomain)->toContain('filteractive')
         ->not->toContain('otherhost1');
 
-    expect($slugs($this->getJson(LINK_CRUD_API.'/v1/links?q=needle')->assertOk()))
+    expect($slugs($this->getJson(Api::LINKS.'?q=needle')->assertOk()))
         ->toBe(['needleslug']);
 
-    expect($slugs($this->getJson(LINK_CRUD_API.'/v1/links?q=findmehere')->assertOk()))
+    expect($slugs($this->getJson(Api::LINKS.'?q=findmehere')->assertOk()))
         ->toBe(['destinationhit']);
 
-    $response = $this->getJson(LINK_CRUD_API.'/v1/links?q=n');
+    $response = $this->getJson(Api::LINKS.'?q=n');
 
     $response->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
@@ -263,7 +262,7 @@ it('shows a link by its public id with the exact resource keys', function () {
         'expires_at' => null,
     ]);
 
-    $response = $this->getJson(LINK_CRUD_API.'/v1/links/'.$link->public_id);
+    $response = $this->getJson(Api::LINKS.'/'.$link->public_id);
 
     $response->assertOk();
 
@@ -292,12 +291,12 @@ it('shows a link by its public id with the exact resource keys', function () {
 it('answers link_not_found for an unknown link', function () {
     linkCrudFixture();
 
-    $response = $this->getJson(LINK_CRUD_API.'/v1/links/'.(string) Str::ulid());
+    $response = $this->getJson(Api::LINKS.'/'.(string) Str::ulid());
 
     $response->assertStatus(404)
         ->assertJsonPath('code', 'link_not_found');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json');
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE);
 });
 
 it('hides a link owned by another workspace', function () {
@@ -309,7 +308,7 @@ it('hides a link owned by another workspace', function () {
         'slug' => 'foreign1',
     ]);
 
-    $this->getJson(LINK_CRUD_API.'/v1/links/'.$foreign->public_id)
+    $this->getJson(Api::LINKS.'/'.$foreign->public_id)
         ->assertStatus(404)
         ->assertJsonPath('code', 'link_not_found');
 });
@@ -323,7 +322,7 @@ it('updates the destination', function () {
         'destination' => 'https://example.com/before',
     ]);
 
-    $this->patchJson(LINK_CRUD_API.'/v1/links/'.$link->public_id, [
+    $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'destination' => 'https://example.com/after',
     ])
         ->assertOk()
@@ -338,11 +337,11 @@ it('accepts active and disabled as user settable statuses only', function () {
         'slug' => 'status01',
     ]);
 
-    $this->patchJson(LINK_CRUD_API.'/v1/links/'.$link->public_id, ['status' => 'disabled'])
+    $this->patchJson(Api::LINKS.'/'.$link->public_id, ['status' => 'disabled'])
         ->assertOk()
         ->assertJsonPath('status', 'disabled');
 
-    $response = $this->patchJson(LINK_CRUD_API.'/v1/links/'.$link->public_id, ['status' => 'blocked']);
+    $response = $this->patchJson(Api::LINKS.'/'.$link->public_id, ['status' => 'blocked']);
 
     $response->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed');
@@ -358,16 +357,16 @@ it('freezes a blocked link but still allows its deletion', function () {
         'slug' => 'blocked1',
     ]);
 
-    $response = $this->patchJson(LINK_CRUD_API.'/v1/links/'.$link->public_id, [
+    $response = $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'destination' => 'https://example.com/changed',
     ]);
 
     $response->assertStatus(403)
         ->assertJsonPath('code', 'link_blocked');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json');
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE);
 
-    $this->deleteJson(LINK_CRUD_API.'/v1/links/'.$link->public_id)->assertNoContent();
+    $this->deleteJson(Api::LINKS.'/'.$link->public_id)->assertNoContent();
 });
 
 it('deletes a link, which then answers 410 on the link host', function () {
@@ -378,9 +377,9 @@ it('deletes a link, which then answers 410 on the link host', function () {
         'slug' => 'deleted1',
     ]);
 
-    $this->deleteJson(LINK_CRUD_API.'/v1/links/'.$link->public_id)->assertNoContent();
+    $this->deleteJson(Api::LINKS.'/'.$link->public_id)->assertNoContent();
 
-    $this->getJson(LINK_CRUD_API.'/v1/links/'.$link->public_id)
+    $this->getJson(Api::LINKS.'/'.$link->public_id)
         ->assertStatus(404)
         ->assertJsonPath('code', 'link_not_found');
 
@@ -396,13 +395,13 @@ it('hides write operations on a link owned by another workspace', function () {
         'slug' => 'foreign2',
     ]);
 
-    $this->patchJson(LINK_CRUD_API.'/v1/links/'.$foreign->public_id, [
+    $this->patchJson(Api::LINKS.'/'.$foreign->public_id, [
         'destination' => 'https://example.com/hijacked',
     ])
         ->assertStatus(404)
         ->assertJsonPath('code', 'link_not_found');
 
-    $this->deleteJson(LINK_CRUD_API.'/v1/links/'.$foreign->public_id)
+    $this->deleteJson(Api::LINKS.'/'.$foreign->public_id)
         ->assertStatus(404)
         ->assertJsonPath('code', 'link_not_found');
 });

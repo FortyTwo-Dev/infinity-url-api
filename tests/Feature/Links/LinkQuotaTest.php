@@ -8,8 +8,7 @@ use App\Models\Workspace;
 use Database\Seeders\LinkDomainSeeder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
-
-const LINK_QUOTA_API = 'https://api.url.infinityproject.fr';
+use Tests\Support\Api;
 
 /**
  * @return array{0: Workspace, 1: User, 2: Domain}
@@ -51,14 +50,14 @@ it('refuses a sixth active link', function () {
 
     linkQuotaFill($workspace, $domain, 5);
 
-    $response = $this->postJson(LINK_QUOTA_API.'/v1/links', [
+    $response = $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/sixth',
     ]);
 
     $response->assertStatus(409)
         ->assertJsonPath('code', 'quota_exceeded');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json')
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE)
         ->and(DB::table('links')->where('workspace_id', $workspace->id)->count())->toBe(5);
 });
 
@@ -67,11 +66,11 @@ it('frees a slot when a link is disabled', function () {
 
     $links = linkQuotaFill($workspace, $domain, 5);
 
-    $this->patchJson(LINK_QUOTA_API.'/v1/links/'.$links[0]->public_id, ['status' => 'disabled'])
+    $this->patchJson(Api::LINKS.'/'.$links[0]->public_id, ['status' => 'disabled'])
         ->assertOk()
         ->assertJsonPath('status', 'disabled');
 
-    $this->postJson(LINK_QUOTA_API.'/v1/links', [
+    $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/replacement',
     ])->assertCreated();
 });
@@ -83,14 +82,14 @@ it('requires a free slot and a future expiration to reactivate a disabled link',
     $disabled = $links[0];
     $other = $links[1];
 
-    $this->patchJson(LINK_QUOTA_API.'/v1/links/'.$disabled->public_id, ['status' => 'disabled'])
+    $this->patchJson(Api::LINKS.'/'.$disabled->public_id, ['status' => 'disabled'])
         ->assertOk();
 
-    $this->postJson(LINK_QUOTA_API.'/v1/links', [
+    $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/refill',
     ])->assertCreated();
 
-    $response = $this->patchJson(LINK_QUOTA_API.'/v1/links/'.$disabled->public_id, [
+    $response = $this->patchJson(Api::LINKS.'/'.$disabled->public_id, [
         'status' => 'active',
         'expires_at' => now()->addDay()->toIso8601String(),
     ]);
@@ -98,10 +97,10 @@ it('requires a free slot and a future expiration to reactivate a disabled link',
     $response->assertStatus(409)
         ->assertJsonPath('code', 'quota_exceeded');
 
-    $this->patchJson(LINK_QUOTA_API.'/v1/links/'.$other->public_id, ['status' => 'disabled'])
+    $this->patchJson(Api::LINKS.'/'.$other->public_id, ['status' => 'disabled'])
         ->assertOk();
 
-    $this->patchJson(LINK_QUOTA_API.'/v1/links/'.$disabled->public_id, [
+    $this->patchJson(Api::LINKS.'/'.$disabled->public_id, [
         'status' => 'active',
         'expires_at' => now()->addDay()->toIso8601String(),
     ])
@@ -121,7 +120,7 @@ it('does not count an expired link against the quota', function () {
         'expires_at' => now()->subMinute(),
     ]);
 
-    $this->postJson(LINK_QUOTA_API.'/v1/links', [
+    $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/after-expiry',
     ])->assertCreated();
 });
@@ -133,13 +132,13 @@ it('keeps the link count unchanged when a creation is refused', function () {
 
     $before = DB::table('links')->where('workspace_id', $workspace->id)->count();
 
-    $this->postJson(LINK_QUOTA_API.'/v1/links', [
+    $this->postJson(Api::LINKS, [
         'destination' => 'javascript:alert(1)',
     ])->assertStatus(422);
 
     expect(DB::table('links')->where('workspace_id', $workspace->id)->count())->toBe($before);
 
-    $this->postJson(LINK_QUOTA_API.'/v1/links', [
+    $this->postJson(Api::LINKS, [
         'destination' => 'https://example.com/refused',
     ])->assertStatus(409);
 

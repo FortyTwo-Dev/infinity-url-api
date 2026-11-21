@@ -8,8 +8,7 @@ use Database\Seeders\LinkDomainSeeder;
 use Database\Seeders\ReservedSlugSeeder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
-
-const SLUG_RENAME_API = 'https://api.url.infinityproject.fr';
+use Tests\Support\Api;
 
 /**
  * @return array{0: Workspace, 1: Domain}
@@ -38,7 +37,7 @@ it('renames a link, tombstoning the old slug and redirecting the new one', funct
         'destination' => 'https://example.com/renamed',
     ]);
 
-    $this->patchJson(SLUG_RENAME_API.'/v1/links/'.$link->public_id, ['slug' => 'newslug'])
+    $this->patchJson(Api::LINKS.'/'.$link->public_id, ['slug' => 'newslug'])
         ->assertOk()
         ->assertJsonPath('slug', 'newslug')
         ->assertJsonPath('short_url', 'https://iurl.fr/newslug');
@@ -68,14 +67,14 @@ it('refuses a slug already used by another link', function () {
         'slug' => 'secondone',
     ]);
 
-    $response = $this->patchJson(SLUG_RENAME_API.'/v1/links/'.$link->public_id, [
+    $response = $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'slug' => 'secondone',
     ]);
 
     $response->assertStatus(409)
         ->assertJsonPath('code', 'slug_taken');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json');
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE);
 
     expect(DB::table('links')->where('id', $link->id)->value('slug'))->toBe('firstone');
 });
@@ -94,7 +93,7 @@ it('refuses a tombstoned slug', function () {
         'erased_at' => now(),
     ]);
 
-    $response = $this->patchJson(SLUG_RENAME_API.'/v1/links/'.$link->public_id, [
+    $response = $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'slug' => 'lostslug',
     ]);
 
@@ -112,14 +111,14 @@ it('refuses a reserved slug on rename', function () {
         'slug' => 'liveone',
     ]);
 
-    $response = $this->patchJson(SLUG_RENAME_API.'/v1/links/'.$link->public_id, [
+    $response = $this->patchJson(Api::LINKS.'/'.$link->public_id, [
         'slug' => 'docs',
     ]);
 
     $response->assertStatus(422)
         ->assertJsonPath('code', 'slug_reserved');
 
-    expect($response->headers->get('Content-Type'))->toContain('application/problem+json');
+    expect($response->headers->get('Content-Type'))->toContain(Api::PROBLEM_CONTENT_TYPE);
 });
 
 it('treats a case variant of the current slug as a no-op', function () {
@@ -131,7 +130,7 @@ it('treats a case variant of the current slug as a no-op', function () {
         'destination' => 'https://example.com/case',
     ]);
 
-    $this->patchJson(SLUG_RENAME_API.'/v1/links/'.$link->public_id, ['slug' => 'CaseTest'])
+    $this->patchJson(Api::LINKS.'/'.$link->public_id, ['slug' => 'CaseTest'])
         ->assertOk()
         ->assertJsonPath('slug', 'casetest');
 

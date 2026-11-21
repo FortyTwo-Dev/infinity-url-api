@@ -3,13 +3,17 @@
 use App\Mail\VerifyEmail;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\Api;
+
+const NEWCOMER_EMAIL = 'newcomer@example.com';
+const REGISTRATION_PASSWORD = 'correct horse battery';
 
 it('registers a new account with a workspace and sends a verification email', function () {
     Mail::fake();
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', [
-        'email' => 'newcomer@example.com',
-        'password' => 'correct horse battery',
+    $response = $this->postJson(Api::REGISTER, [
+        'email' => NEWCOMER_EMAIL,
+        'password' => REGISTRATION_PASSWORD,
     ]);
 
     $response->assertStatus(201);
@@ -19,7 +23,7 @@ it('registers a new account with a workspace and sends a verification email', fu
     expect(User::count())->toBe(1);
 
     $user = User::query()->firstOrFail();
-    expect($user->email)->toBe('newcomer@example.com');
+    expect($user->email)->toBe(NEWCOMER_EMAIL);
     expect($user->email_verified_at)->toBeNull();
 
     expect($user->workspaces()->count())->toBe(1);
@@ -28,7 +32,7 @@ it('registers a new account with a workspace and sends a verification email', fu
     expect($workspace->name)->toBe('My workspace');
 
     Mail::assertSentCount(1);
-    Mail::assertSent(VerifyEmail::class, fn (VerifyEmail $mail): bool => $mail->hasTo('newcomer@example.com'));
+    Mail::assertSent(VerifyEmail::class, fn (VerifyEmail $mail): bool => $mail->hasTo(NEWCOMER_EMAIL));
 });
 
 it('answers 201 twice and resends the verification link while the account is unverified', function () {
@@ -36,11 +40,11 @@ it('answers 201 twice and resends the verification link while the account is unv
 
     $payload = [
         'email' => 'twice@example.com',
-        'password' => 'correct horse battery',
+        'password' => REGISTRATION_PASSWORD,
     ];
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', $payload)->assertStatus(201);
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', $payload)->assertStatus(201);
+    $this->postJson(Api::REGISTER, $payload)->assertStatus(201);
+    $this->postJson(Api::REGISTER, $payload)->assertStatus(201);
 
     expect(User::count())->toBe(1);
     Mail::assertSentCount(2);
@@ -51,15 +55,15 @@ it('does not resend a verification link once the account is verified', function 
 
     $payload = [
         'email' => 'verified@example.com',
-        'password' => 'correct horse battery',
+        'password' => REGISTRATION_PASSWORD,
     ];
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', $payload)->assertStatus(201);
+    $this->postJson(Api::REGISTER, $payload)->assertStatus(201);
 
     $user = User::query()->firstOrFail();
     $user->forceFill(['email_verified_at' => now()])->save();
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', $payload)->assertStatus(201);
+    $this->postJson(Api::REGISTER, $payload)->assertStatus(201);
 
     expect(User::count())->toBe(1);
     Mail::assertSentCount(1);
@@ -71,9 +75,9 @@ it('does not recreate a soft-deleted account and sends it no verification email'
     $user = User::factory()->create(['email' => 'gone@example.com']);
     $user->delete();
 
-    $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', [
+    $this->postJson(Api::REGISTER, [
         'email' => 'gone@example.com',
-        'password' => 'correct horse battery',
+        'password' => REGISTRATION_PASSWORD,
     ])->assertStatus(201);
 
     expect(User::withTrashed()->count())->toBe(1);
@@ -84,13 +88,13 @@ it('does not recreate a soft-deleted account and sends it no verification email'
 it('rejects an invalid email address', function () {
     Mail::fake();
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', [
+    $response = $this->postJson(Api::REGISTER, [
         'email' => 'not-an-email',
-        'password' => 'correct horse battery',
+        'password' => REGISTRATION_PASSWORD,
     ]);
 
     $response->assertStatus(422);
-    expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
+    expect((string) $response->headers->get('Content-Type'))->toStartWith(Api::PROBLEM_CONTENT_TYPE);
     expect($response->json('code'))->toBe('validation_failed');
     expect($response->json('instance'))->toBe('/v1/auth/register');
     expect($response->json('errors'))->toHaveKey('email');
@@ -101,7 +105,7 @@ it('rejects an invalid email address', function () {
 it('requires a password of at least twelve characters', function () {
     Mail::fake();
 
-    $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', [
+    $response = $this->postJson(Api::REGISTER, [
         'email' => 'short@example.com',
         'password' => 'elevenchars',
     ]);
@@ -118,15 +122,15 @@ it('answers identically for a new and an existing address', function () {
 
     $payload = [
         'email' => 'enumeration@example.com',
-        'password' => 'correct horse battery',
+        'password' => REGISTRATION_PASSWORD,
     ];
 
-    $first = $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', $payload);
+    $first = $this->postJson(Api::REGISTER, $payload);
     $first->assertStatus(201);
 
     User::query()->firstOrFail()->forceFill(['email_verified_at' => now()])->save();
 
-    $second = $this->postJson('https://api.url.infinityproject.fr/v1/auth/register', $payload);
+    $second = $this->postJson(Api::REGISTER, $payload);
     $second->assertStatus(201);
 
     expect($second->getContent())->toBe($first->getContent());

@@ -35,7 +35,7 @@ trait ApiHelpers
 
     protected function login(string $email, string $password = 'password'): TestResponse
     {
-        $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
+        $response = $this->postJson(Api::LOGIN, [
             'email' => $email,
             'password' => $password,
         ]);
@@ -63,7 +63,7 @@ trait ApiHelpers
      */
     protected function challenge(string $email, string $password = 'password'): string
     {
-        $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/login', [
+        $response = $this->postJson(Api::LOGIN, [
             'email' => $email,
             'password' => $password,
         ]);
@@ -83,7 +83,7 @@ trait ApiHelpers
     protected function refreshWith(string $cookie): TestResponse
     {
         return $this->withRefreshCookie($cookie)
-            ->postJson('https://api.url.infinityproject.fr/v1/auth/refresh');
+            ->postJson(Api::REFRESH);
     }
 
     /**
@@ -93,7 +93,7 @@ trait ApiHelpers
     {
         Sanctum::actingAs($user, ['me:write']);
 
-        $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/enable');
+        $response = $this->postJson(Api::TWO_FACTOR_ENABLE);
         $response->assertStatus(200);
 
         expect($response->json('secret'))->toBeString()->not->toBe('');
@@ -103,7 +103,7 @@ trait ApiHelpers
 
     protected function confirmTotp(string $secret): TestResponse
     {
-        $response = $this->postJson('https://api.url.infinityproject.fr/v1/auth/2fa/confirm', [
+        $response = $this->postJson(Api::TWO_FACTOR_CONFIRM, [
             'code' => $this->totpCode($secret),
         ]);
 
@@ -152,20 +152,20 @@ trait ApiHelpers
     protected function assertProblem(TestResponse $response, int $status, string $code): void
     {
         $response->assertStatus($status);
-        expect((string) $response->headers->get('Content-Type'))->toStartWith('application/problem+json');
+        expect((string) $response->headers->get('Content-Type'))->toStartWith(Api::PROBLEM_CONTENT_TYPE);
         expect($response->json('code'))->toBe($code);
     }
 
     protected function requestVerification(string $email): void
     {
-        $this->postJson('https://api.url.infinityproject.fr/v1/auth/verification/resend', [
+        $this->postJson(Api::RESEND_VERIFICATION, [
             'email' => $email,
         ])->assertStatus(202);
     }
 
     protected function requestReset(string $email): void
     {
-        $this->postJson('https://api.url.infinityproject.fr/v1/auth/password/forgot', [
+        $this->postJson(Api::PASSWORD_FORGOT, [
             'email' => $email,
         ])->assertStatus(202);
     }
@@ -217,7 +217,7 @@ trait ApiHelpers
         $token = $user->createToken('dashboard', ['*'])->plainTextToken;
 
         $this->withToken($token)
-            ->deleteJson('https://api.url.infinityproject.fr/v1/me', [
+            ->deleteJson(Api::ME, [
                 'password' => 'password',
             ])
             ->assertStatus(204);
