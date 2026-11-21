@@ -28,7 +28,8 @@ it('does not rewrite the email or bump updated_at when an unchanged email is sav
         $this->travelTo(now()->addMinutes(5));
 
         $user = User::query()->findOrFail($user->id);
-        $user->email = $user->email;
+        $email = $user->email;
+        $user->email = $email;
         $user->save();
     } finally {
         $this->travelBack();
