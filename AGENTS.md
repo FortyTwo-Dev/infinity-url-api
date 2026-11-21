@@ -3,8 +3,9 @@
 L'API du raccourcisseur privacy-first : route de redirection, REST API, pipeline
 analytique. Domaine de liens : `iurl.fr`.
 
-Ce dépôt ne contient **ni front, ni Blade, ni Vite**. Le dashboard et le site
-vivent dans `infinity-url`. Ici, uniquement du JSON et des redirections.
+Ce dépôt ne contient **ni front, ni Vite**. Blade est autorisé pour une seule
+chose : les quatre pages d'erreur de `iurl.fr`. Le dashboard et le site vivent
+dans `infinity-url`.
 
 ## Project language
 
@@ -116,7 +117,10 @@ enfreindre, **arrête et pose la question**.
 ## Tests
 
 - Pest. PostgreSQL et Valkey réels, jamais SQLite ni mock de cache.
-- Les onze invariants de `docs/09-tests.md` §2.2 existent dès la première étape.
+- Les invariants de `docs/09-tests.md` §2.2 sont créés avec l'étape qui construit
+  leur sujet, et jamais affaiblies. S1 en prouve quatre : redirection sans cookie,
+  absence de colonne d'IP et de table de clics, absence de user-agent persisté,
+  aucune route sans ability.
 - 100 % de couverture exigée sur : clé de dédup, slugs, rétention, route de
   redirection.
 - Si un test d'invariant doit changer, c'est le code ou le document qui est en

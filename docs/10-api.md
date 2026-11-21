@@ -299,7 +299,14 @@ Les seules pages servies sur `iurl.fr` sont les états terminaux (`404`, `410`, 
 
 ### Pages d'erreur sur `iurl.fr`
 
-Servies en HTML **statique**, CSS inline, **aucun JavaScript, aucune requête externe**. Sinon l'invariant « aucun script tiers sur le domaine de liens » tombe.
+Rendues par **Blade**, et par Blade uniquement : ces quatre pages sont la seule vue du dépôt. Le HTML produit reste statique — CSS inline, **aucun JavaScript, aucune ressource externe** (ni police, ni image, ni feuille de style distante). Sinon l'invariant « aucun script sur le domaine de liens » tombe.
+
+| Vue | Statut | Texte |
+| --- | --- | --- |
+| `errors/404` | `404` | « Ce lien n'existe pas. » + lien vers `https://infinityproject.fr` |
+| `errors/410-deleted` | `410` | « Ce lien a été supprimé définitivement. » |
+| `errors/410-expired` | `410` | « Ce lien a expiré. » |
+| `errors/403` | `403` | « Ce lien a été bloqué pour abus. » + `abuse@iurl.fr` |
 
 | Cas | Statut | Contenu |
 | --- | --- | --- |

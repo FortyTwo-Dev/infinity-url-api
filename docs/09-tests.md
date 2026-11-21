@@ -38,7 +38,7 @@ C'est la partie la plus importante du document. Ces tests ne testent pas du code
 | Aucun cookie sur la redirection | `GET /{slug}` ne contient aucun `Set-Cookie` | `tests/Feature/RedirectPrivacyTest.php` |
 | Aucune colonne d'IP | Introspection du schéma : aucune colonne nommée `ip*` dans aucune table | `tests/Architecture/NoIpColumnTest.php` |
 | Aucune table de clics | Le schéma ne contient aucune table d'événements de clic | idem |
-| Aucun script tiers sur `iurl.fr` | La route de redirection ne sert que des en-têtes, aucun corps HTML | `RedirectPrivacyTest` |
+| Aucun script sur `iurl.fr` | La redirection ne sert que des en-têtes, et les pages d'erreur ne contiennent ni `<script>`, ni ressource externe | `RedirectPrivacyTest` + `ErrorPagePrivacyTest` |
 | Clé non corrélable entre liens | Même IP + deux `link_id` → deux clés différentes | `tests/Unit/DedupKeyTest.php` |
 | Sel irrécupérable | Après rotation, l'ancien sel n'est plus accessible | `tests/Feature/SaltRotationTest.php` |
 | User-agent jamais persisté | Aucune colonne UA, aucun log applicatif contenant l'UA | `tests/Architecture/NoUserAgentTest.php` |
