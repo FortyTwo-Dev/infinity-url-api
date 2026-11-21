@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Exceptions\UnsupportedCacheRepositoryException;
 use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
-use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
             $repository = $app->make(CacheRepository::class);
 
             if (! $repository instanceof Repository) {
-                throw new RuntimeException('The default cache store must be an Illuminate cache repository.');
+                throw new UnsupportedCacheRepositoryException('The default cache store must be an Illuminate cache repository.');
             }
 
             return $repository;

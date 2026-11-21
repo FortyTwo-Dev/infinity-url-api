@@ -42,22 +42,24 @@ final readonly class RedirectResult
 
     public function isValid(): bool
     {
-        if ($this->status === 302) {
-            if ($this->location === null) {
-                return false;
-            }
+        return match ($this->status) {
+            302 => $this->hasValidLocation(),
+            410 => $this->reason === 'deleted' || $this->reason === 'expired',
+            403, 404 => true,
+            default => false,
+        };
+    }
 
-            $location = strtolower($this->location);
-
-            return (str_starts_with($location, 'http://') || str_starts_with($location, 'https://'))
-                && preg_match('/[\x00-\x1F\x7F]/', $this->location) !== 1;
+    private function hasValidLocation(): bool
+    {
+        if ($this->location === null) {
+            return false;
         }
 
-        if ($this->status === 410) {
-            return $this->reason === 'deleted' || $this->reason === 'expired';
-        }
+        $location = strtolower($this->location);
 
-        return $this->status === 403 || $this->status === 404;
+        return (str_starts_with($location, 'http://') || str_starts_with($location, 'https://'))
+            && preg_match('/[\x00-\x1F\x7F]/', $this->location) !== 1;
     }
 
     /**

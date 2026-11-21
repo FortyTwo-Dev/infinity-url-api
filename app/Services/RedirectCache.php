@@ -58,33 +58,38 @@ final class RedirectCache
     public function acquire(string $host, string $slug): ?Lock
     {
         try {
-            $store = $this->cache->getStore();
-
-            if (! $store instanceof LockProvider) {
-                return null;
-            }
-
-            $lock = $store->lock(
-                self::key($host, $slug).':lock',
-                (int) config('redirect.lock.seconds', 10),
-            );
-
-            $deadline = microtime(true) + (float) config('redirect.lock.wait', 5);
-
-            while (! $lock->get()) {
-                if (microtime(true) >= $deadline) {
-                    return null;
-                }
-
-                usleep(50_000);
-            }
-
-            return $lock;
+            return $this->waitForLock($host, $slug);
         } catch (Throwable $exception) {
             report($exception);
 
             return null;
         }
+    }
+
+    private function waitForLock(string $host, string $slug): ?Lock
+    {
+        $store = $this->cache->getStore();
+
+        if (! $store instanceof LockProvider) {
+            return null;
+        }
+
+        $lock = $store->lock(
+            self::key($host, $slug).':lock',
+            (int) config('redirect.lock.seconds', 10),
+        );
+
+        $deadline = microtime(true) + (float) config('redirect.lock.wait', 5);
+
+        while (! $lock->get()) {
+            if (microtime(true) >= $deadline) {
+                return null;
+            }
+
+            usleep(50_000);
+        }
+
+        return $lock;
     }
 
     public function release(Lock $lock): void

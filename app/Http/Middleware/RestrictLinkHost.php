@@ -21,27 +21,25 @@ final class RestrictLinkHost
 
     public function handle(Request $request, Closure $next): Response
     {
+        return $this->isAllowed($request) ? $next($request) : $this->errors->notFound();
+    }
+
+    private function isAllowed(Request $request): bool
+    {
         if ($request->getHost() !== (string) config('redirect.host')) {
-            return $next($request);
+            return true;
         }
 
         try {
             $route = $this->router->getRoutes()->match($request);
         } catch (NotFoundHttpException|MethodNotAllowedHttpException) {
-            return $this->errors->notFound();
-        }
-
-        if ($route->getName() !== 'redirect') {
-            return $this->errors->notFound();
+            return false;
         }
 
         $slug = $route->parameter('slug');
-        $path = rawurldecode($request->getPathInfo());
 
-        if (! is_string($slug) || $path !== '/'.$slug) {
-            return $this->errors->notFound();
-        }
-
-        return $next($request);
+        return $route->getName() === 'redirect'
+            && is_string($slug)
+            && rawurldecode($request->getPathInfo()) === '/'.$slug;
     }
 }
