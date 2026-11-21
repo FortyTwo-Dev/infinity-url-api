@@ -59,7 +59,7 @@ Le test `NoIpColumnTest` est volontairement brutal : il échoue si quelqu'un ajo
 - **Tokens API** : création, scopes, rotation, révocation, hachage au repos.
 - **Liens** : création, validation, édition, suppression, expiration.
 - **Redirection** : `302`, cache chaud, cache froid, negative cache sur 404, `410` sur slug supprimé, TTL, singleflight, échec ouvert Valkey, `503` sur base froide indisponible, et invalidation à l'édition, au renommage, à la suppression et au blocage.
-- **Rate limiting** : dépassement, en-têtes `X-RateLimit-*`, 404 répétés.
+- **Rate limiting** : dépassement, en-têtes `RateLimit-*`, 404 répétés.
 - **OpenAPI** : la spec générée est valide et contient toutes les routes publiques.
 
 ### 2.4 Intégration

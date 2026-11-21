@@ -209,7 +209,7 @@ create table slug_tombstones (
 );
 ```
 
-Utilisée uniquement lors d'un **effacement définitif** (demande RGPD) : on supprime la ligne `links`, et on insère le slug ici pour qu'il reste réservé. Sans ça, un effacement permettrait à un tiers de réclamer le slug et de récupérer les clics des QR déjà imprimés.
+Utilisée lors d'un **effacement définitif** (demande RGPD) **et lors du renommage d'un slug** (D-117) : on supprime la ligne `links` ou on change son slug, et on insère l'ancien slug ici pour qu'il reste réservé. Sans ça, un effacement permettrait à un tiers de réclamer le slug et de récupérer les clics des QR déjà imprimés, et un renommage libérerait l'ancienne URL.
 
 ```sql
 create table reserved_slugs (

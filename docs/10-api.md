@@ -188,9 +188,9 @@ Le seuil de redirection est volontairement haut : une entreprise derrière un NA
 
 | Méthode | Chemin | Scope | Rôle |
 | --- | --- | --- | --- |
-| GET | `/me` | — | Utilisateur, workspace, **`capabilities`** |
-| GET | `/me/export` | — | **Export de portabilité (art. 20)** : compte, workspace, liens, stats agrégées. Allowlist stricte, jamais de hash ni de secret (D-111) |
-| GET | `/workspaces` | — | Un seul en v1, mais l'endpoint existe |
+| GET | `/me` | `me:read` | Utilisateur, workspace, **`capabilities`** |
+| GET | `/me/export` | `me:read` | **Export de portabilité (art. 20)** : compte, workspace, liens, stats agrégées. Allowlist stricte, jamais de hash ni de secret (D-111) |
+| GET | `/workspaces` | `me:read` | Un seul en v1, mais l'endpoint existe |
 | GET | `/links` | `links:read` | Liste paginée, filtres `?domain=`, `?status=`, `?q=` |
 | POST | `/links` | `links:write` | Création |
 | GET | `/links/{id}` | `links:read` | Détail |
