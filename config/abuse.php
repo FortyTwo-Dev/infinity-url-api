@@ -17,7 +17,9 @@ return [
 
     'enabled' => (bool) env('ABUSE_CHECK_ENABLED', true),
 
-    'psl_path' => env('PSL_PATH', resource_path('psl/public_suffix_list.dat')),
+    // `?:` and not `env(..., default)`: an empty variable in .env must not
+    // disable the list, it must fall back to the vendored copy.
+    'psl_path' => env('PSL_PATH') ?: resource_path('psl/public_suffix_list.dat'),
 
     /*
     |--------------------------------------------------------------------------
