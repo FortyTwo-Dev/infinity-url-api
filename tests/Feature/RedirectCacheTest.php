@@ -4,6 +4,7 @@ use App\Enums\LinkStatus;
 use App\Models\Domain;
 use App\Models\Link;
 use App\Services\RedirectCache;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ function redirectCacheTtl(string $key): int
 }
 
 it('serves a warm redirect without reading the links table', function () {
+    // The click job would run inline on the synchronous queue and read the
+    // link row it serialises with; queue it, as production does in a worker.
+    config(['queue.default' => 'redis']);
+
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     Link::factory()->forDomain($domain)->create([
         'slug' => 'warm1',
@@ -62,6 +67,10 @@ it('serves a negative cache hit without reading the links table', function () {
 });
 
 it('bounds the redirect cache ttl by the link expiration', function () {
+    // Freeze the clock: a two-second window makes the TTL assertion flaky
+    // under a loaded suite.
+    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     Link::factory()->forDomain($domain)->create([
         'slug' => 'shortttl1',
@@ -96,6 +105,8 @@ it('never caches a redirect for an already expired link', function () {
 });
 
 it('forgets a redirect cache entry explicitly', function () {
+    config(['queue.default' => 'redis']);
+
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     $slug = 'forget1';
     $destination = 'https://example.com/forget';
@@ -222,6 +233,25 @@ it('replaces a malformed cache value from postgres', function (array $cached): v
     expect(data_get($rewritten, 'status'))->toBe(302);
     expect(data_get($rewritten, 'location'))->toBe($destination);
 })->with('malformed redirect cache values');
+
+it('treats a cached 302 without link_id as a miss', function () {
+    $domain = Domain::factory()->forHost('iurl.fr')->create();
+    $link = Link::factory()->forDomain($domain)->create([
+        'slug' => 'stalecache1',
+        'destination' => 'https://example.com/fresh',
+    ]);
+
+    $key = 'link:iurl.fr:stalecache1';
+    Cache::put($key, ['status' => 302, 'location' => 'https://example.com/stale'], 60);
+
+    $this->get('https://iurl.fr/stalecache1')
+        ->assertStatus(302)
+        ->assertHeader('Location', 'https://example.com/fresh');
+
+    $rewritten = Cache::get($key);
+
+    expect((int) data_get($rewritten, 'link_id'))->toBe($link->id);
+});
 
 it('invalidates the cache when a link destination is updated', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();

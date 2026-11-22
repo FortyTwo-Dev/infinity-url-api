@@ -211,6 +211,7 @@ PHP;
             'APP_ENV' => 'testing',
             'APP_KEY' => (string) config('app.key'),
             'BLIND_INDEX_KEY' => (string) config('identity.blind_index_key'),
+            'ANALYTICS_SALT_PATH' => (string) config('analytics.salt_path'),
             'DB_CONNECTION' => (string) config('database.default'),
             'DB_DATABASE' => (string) $connection['database'],
             'DB_HOST' => (string) $connection['host'],

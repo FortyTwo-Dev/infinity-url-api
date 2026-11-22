@@ -48,6 +48,9 @@ C'est la partie la plus importante du document. Ces tests ne testent pas du code
 | **Hash d'index jamais exposé** | `email_hash` absent de toute réponse JSON et de tout payload | `tests/Feature/HashColumnsHiddenTest.php` |
 | **Rotation d'`APP_KEY` sans perte d'index** | Changer `app.key` ne modifie pas `EmailHasher::hash()` (clé dédiée) | `tests/Unit/BlindIndexKeyTest.php` |
 | **Export en allowlist** | `GET /me/export` ne renvoie que les clés déclarées par `PersonalDataInventory` | `tests/Feature/PersonalDataExportTest.php` |
+| **Aucune donnée personnelle dans la file** | Le job sérialisé ne contient ni IP, ni user-agent, ni destination, ni slug | `tests/Feature/Analytics/AnalyticsPayloadPrivacyTest.php` |
+| **Aucun unique cumulé** | Ni la réponse stats ni l'export ne somment `daily`, `weekly` ou `dim` | `tests/Feature/Analytics/StatsApiTest.php` |
+| **Aucune ligne pays** | `link_stats_dim` ne contient que des lignes `device` (D-120) | `tests/Feature/Analytics/AnalyticsJobTest.php` |
 | Purge des logs ≤ 72 h | La configuration de journalisation a un plafond dur ≤ 72 h | `tests/Feature/LogRetentionConfigTest.php` |
 | **Aucune route sans ability** | Toute route authentifiée déclare au moins une ability ; un jeton `refresh` ne peut atteindre aucun endpoint | `tests/Architecture/RouteAbilitiesTest.php` |
 
@@ -121,7 +124,7 @@ Le but est de détecter une régression — un N+1, un cache débranché, un mid
 | Job | Contenu |
 | --- | --- |
 | API — qualité | Pint, PHPStan niveau 6 |
-| API — tests | Unitaires, fonctionnels, invariants, intégration |
+| API — tests | Unitaires, fonctionnels, invariants, intégration, **porte de couverture** sur les cinq modules critiques (`scripts/check-coverage.php` sur le rapport clover, PCOV) |
 | API — sécurité | `composer audit` |
 | API — licences | Vérification qu'aucune dépendance `GPL-2.0-only` n'entre dans le projet |
 | Web — qualité | ESLint, `vue-tsc` |
@@ -143,7 +146,9 @@ Dépôt public ⇒ minutes GitHub Actions illimitées et gratuites. C'est un ava
 
 ## 5. Règle de couverture
 
-La couverture de 100 % n'est exigée que sur quatre modules, et vérifiée en CI :
+La couverture de 100 % n'est exigée que sur cinq modules, et vérifiée en CI
+par `scripts/check-coverage.php` sur le rapport clover généré avec PCOV. Un
+module absent du rapport est un échec, pas une dispense.
 
 | Module | Pourquoi |
 | --- | --- |

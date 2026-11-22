@@ -14,6 +14,7 @@ use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\Auth\VerifyTotpController;
 use App\Http\Controllers\LinkController;
+use App\Http\Controllers\LinkStatsController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WorkspaceController;
@@ -58,6 +59,11 @@ Route::middleware('auth:sanctum')->group(function () use ($linkUri): void {
     Route::get($linkUri, [LinkController::class, 'show'])->middleware('abilities:links:read');
     Route::patch($linkUri, [LinkController::class, 'update'])->middleware('abilities:links:write');
     Route::delete($linkUri, [LinkController::class, 'destroy'])->middleware('abilities:links:write');
+
+    Route::get($linkUri.'/stats', [LinkStatsController::class, 'show'])
+        ->middleware('abilities:stats:read');
+    Route::get($linkUri.'/stats.csv', [LinkStatsController::class, 'csv'])
+        ->middleware('abilities:stats:read');
 
     Route::get('tokens', [TokenController::class, 'index'])->middleware('abilities:tokens:read');
     Route::post('tokens', [TokenController::class, 'store'])

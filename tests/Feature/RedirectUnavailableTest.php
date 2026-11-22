@@ -2,6 +2,8 @@
 
 use App\Models\Domain;
 use App\Models\Link;
+use Illuminate\Database\LostConnectionException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -68,3 +70,52 @@ it('serves a cached redirect when postgres becomes unavailable', function () {
     $response->assertStatus(302);
     $response->assertHeader('Location', 'https://example.com/dbdownwarm');
 });
+
+dataset('database failures during resolution', [
+    'lost connection' => [
+        'dbinject1',
+        static fn (): Throwable => new LostConnectionException('lost'),
+        503,
+    ],
+    'query exception with an outage sqlstate' => [
+        'dbinject2',
+        static fn (): Throwable => new QueryException(
+            'pgsql',
+            'select 1',
+            [],
+            new PDOException('SQLSTATE[08006] connection failure'),
+        ),
+        503,
+    ],
+    'raw pdo outage' => [
+        'dbinject3',
+        static fn (): Throwable => new PDOException('SQLSTATE[08006] connection failure'),
+        503,
+    ],
+    'query exception with another cause' => [
+        'dbinject4',
+        static fn (): Throwable => new QueryException('pgsql', 'select 1', [], new PDOException('boom')),
+        500,
+    ],
+    'raw pdo error' => [
+        'dbinject5',
+        static fn (): Throwable => new PDOException('boom'),
+        500,
+    ],
+]);
+
+it('maps a database failure during resolution to the right status', function (string $slug, Closure $failure, int $status) {
+    $domain = Domain::factory()->forHost('iurl.fr')->create();
+    Link::factory()->forDomain($domain)->create([
+        'slug' => $slug,
+        'destination' => 'https://example.com/dbinject',
+    ]);
+
+    Cache::flush();
+
+    DB::connection()->beforeExecuting(function () use ($failure): void {
+        throw $failure();
+    });
+
+    $this->get('https://iurl.fr/'.$slug)->assertStatus($status);
+})->with('database failures during resolution');

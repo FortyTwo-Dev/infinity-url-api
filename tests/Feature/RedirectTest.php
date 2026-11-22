@@ -2,6 +2,7 @@
 
 use App\Enums\DomainStatus;
 use App\Enums\LinkStatus;
+use App\Jobs\RecordClick;
 use App\Models\Domain;
 use App\Models\Link;
 use Illuminate\Support\Facades\Cache;
@@ -215,7 +216,7 @@ it('does not cache a redirect whose ttl rounds down to zero', function () {
     }
 });
 
-it('never queues analytics or writes to the database during a redirect', function () {
+it('writes nothing to the database during a redirect', function () {
     Queue::fake();
 
     $domain = Domain::factory()->forHost('iurl.fr')->create();
@@ -234,6 +235,19 @@ it('never queues analytics or writes to the database during a redirect', functio
 
     $this->get('https://iurl.fr/readonly1')->assertStatus(302);
 
-    Queue::assertNothingPushed();
     expect($writes)->toBe([]);
+});
+
+it('enqueues exactly one analytics job for a redirect', function () {
+    Queue::fake();
+
+    $domain = Domain::factory()->forHost('iurl.fr')->create();
+    Link::factory()->forDomain($domain)->create([
+        'slug' => 'counted1',
+        'destination' => 'https://example.com/counted',
+    ]);
+
+    $this->get('https://iurl.fr/counted1')->assertStatus(302);
+
+    Queue::assertPushed(RecordClick::class, 1);
 });

@@ -6,3 +6,4 @@ Decisions taken in this repository, newest last. Each record follows
 | ADR | Title | Status |
 | --- | --- | --- |
 | [0001](0001-s2-links-and-slugs.md) | S2 account, token and link implementation choices | accepted |
+| [0002](0002-s3-analytics.md) | S3 analytics pipeline choices | accepted |

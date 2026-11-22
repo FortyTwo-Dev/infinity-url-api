@@ -330,6 +330,252 @@
                 }
             }
         },
+        "/links/{id}/stats": {
+            "get": {
+                "operationId": "linkStats.show",
+                "tags": [
+                    "LinkStats"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "week"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daily or weekly buckets. Uniques are per bucket and never summed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "link_id": {
+                                            "type": "string"
+                                        },
+                                        "interval": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string"
+                                        },
+                                        "to": {
+                                            "type": "string"
+                                        },
+                                        "retention_days": {
+                                            "type": "integer"
+                                        },
+                                        "clamped": {
+                                            "type": "boolean"
+                                        },
+                                        "summary": {
+                                            "type": "object",
+                                            "properties": {
+                                                "clicks": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "clicks"
+                                            ]
+                                        },
+                                        "series": {
+                                            "type": "array",
+                                            "items": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "date": {
+                                                                "type": "string"
+                                                            },
+                                                            "clicks": {
+                                                                "type": "integer"
+                                                            },
+                                                            "uniques": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "date",
+                                                            "clicks",
+                                                            "uniques"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "iso_year": {
+                                                                "type": "integer"
+                                                            },
+                                                            "iso_week": {
+                                                                "type": "integer"
+                                                            },
+                                                            "week_start": {
+                                                                "type": "string"
+                                                            },
+                                                            "clicks": {
+                                                                "type": "integer"
+                                                            },
+                                                            "uniques": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "iso_year",
+                                                            "iso_week",
+                                                            "week_start",
+                                                            "clicks",
+                                                            "uniques"
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "devices": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "device": {
+                                                        "type": "string"
+                                                    },
+                                                    "clicks": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "device",
+                                                    "clicks"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "link_id",
+                                        "interval",
+                                        "from",
+                                        "to",
+                                        "retention_days",
+                                        "clamped",
+                                        "summary",
+                                        "series",
+                                        "devices"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/links/{id}/stats.csv": {
+            "get": {
+                "operationId": "linkStats.csv",
+                "tags": [
+                    "LinkStats"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "week"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV export of the same series, one row per bucket.",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "operationId": "auth.login",
@@ -747,7 +993,82 @@
                                         },
                                         "statistics": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "link_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "daily": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "date": {
+                                                                    "type": "string"
+                                                                },
+                                                                "clicks": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "uniques": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "date",
+                                                                "clicks",
+                                                                "uniques"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "weekly": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "iso_year": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "iso_week": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "uniques": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "iso_year",
+                                                                "iso_week",
+                                                                "uniques"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "devices": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "device": {
+                                                                    "type": "string"
+                                                                },
+                                                                "clicks": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "device",
+                                                                "clicks"
+                                                            ]
+                                                        }
+                                                    }
+                                                },
+                                                "required": [
+                                                    "link_id",
+                                                    "daily",
+                                                    "weekly",
+                                                    "devices"
+                                                ]
+                                            }
                                         }
                                     },
                                     "required": [

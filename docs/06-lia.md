@@ -176,6 +176,8 @@ Un LIA qui affirme n'a pas de valeur. Un LIA qui cite des artefacts vérifiables
 | Sel détruit à la rotation | Job planifié de remplacement, sans archivage de l'ancienne valeur | Test : l'ancien sel n'est plus accessible après rotation |
 | Clé non corrélable entre liens | Test unitaire : même IP + deux `link_id` différents → deux clés différentes | Test unitaire nommé explicitement |
 | Rétention des agrégats | Job de purge quotidien | Test d'intégration |
+| Aucune donnée personnelle dans la file | Le payload sérialisé du job analytique ne contient ni IP, ni UA, ni destination | Test CI + revue du payload |
+| Énumération des slugs limitée | `404` plafonnés à 60/min par IP empreintée au sel, TTL 60 s, sur le chemin froid | Test d'intégration + revue du middleware |
 | Logs à 72 h | Plafond dur de journald ou logrotate | Revue de configuration + test |
 | Absence de corrélation inter-clients | La clé contient le `link_id`, donc deux clients ne peuvent pas produire la même clé | Test unitaire + revue de la fonction de hachage |
 | Email chiffré au repos | `Crypt` (AES-256-GCM) sur `users.email` ; index aveugle HMAC dans `email_hash` avec `BLIND_INDEX_KEY` | Test : aucune valeur lisible dans `users.email` ; `email_hash` absent de toute réponse |

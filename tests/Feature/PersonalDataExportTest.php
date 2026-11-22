@@ -4,10 +4,16 @@ use App\Models\Domain;
 use App\Models\Link;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Database\Seeders\LinkDomainSeeder;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\AnalyticsHelpers;
+
+uses(AnalyticsHelpers::class);
 
 const PERSONAL_DATA_EXPORT_API = 'https://api.url.infinityproject.fr';
+const EXPORT_PATH = '/v1/me/export';
+const EXPORT_STATS_DAY = '2026-11-20';
 
 /**
  * @param  array<string, mixed>  $value
@@ -43,6 +49,39 @@ function personalDataExportJsonKeys(mixed $value): array
     return $keys;
 }
 
+/**
+ * One workspace, its owner and one link on iurl.fr, ready for a stats export.
+ *
+ * @return array{workspace: Workspace, user: User, link: Link, domain: Domain}
+ */
+function personalDataExportStatsFixture(
+    string $workspaceName,
+    string $email,
+    string $slug,
+    string $destination,
+): array {
+    test()->seed(LinkDomainSeeder::class);
+
+    $workspace = Workspace::factory()->create(['name' => $workspaceName]);
+    $user = User::factory()->create(['email' => $email]);
+    $workspace->members()->attach($user->id, ['role' => 'owner']);
+
+    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
+    $link = Link::factory()->forDomain($domain)->create([
+        'workspace_id' => $workspace->id,
+        'slug' => $slug,
+        'destination' => $destination,
+        'expires_at' => null,
+    ]);
+
+    return [
+        'workspace' => $workspace,
+        'user' => $user,
+        'link' => $link,
+        'domain' => $domain,
+    ];
+}
+
 it('exports exactly the allowlisted personal data', function () {
     $this->seed(LinkDomainSeeder::class);
 
@@ -59,7 +98,7 @@ it('exports exactly the allowlisted personal data', function () {
         'expires_at' => null,
     ]);
 
-    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.'/v1/me/export');
+    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.EXPORT_PATH);
     $response->assertOk();
 
     $body = $response->json();
@@ -114,7 +153,112 @@ it('exports exactly the allowlisted personal data', function () {
 
     $keys = personalDataExportJsonKeys($body);
 
-    foreach (['email_hash', 'password_hash', 'totp_secret', 'code_hash', 'used_at'] as $forbidden) {
+    foreach (['email_hash', 'password_hash', 'totp_secret', 'code_hash', 'used_at', 'country', 'ip', 'user_agent', 'referer'] as $forbidden) {
         expect($keys)->not->toContain($forbidden);
     }
+});
+
+it('exports the aggregated statistics of the workspace links', function () {
+    ['user' => $user, 'link' => $link, 'domain' => $domain] = personalDataExportStatsFixture(
+        'Stats workspace',
+        'stats-owner@example.com',
+        'exportstats1',
+        'https://example.com/export-stats',
+    );
+
+    $this->seedDailyStats($link->id, EXPORT_STATS_DAY, 5, 3);
+    $this->seedWeeklyStats($link->id, 2026, 47, 4);
+    $this->seedDeviceStats($link->id, EXPORT_STATS_DAY, 'mobile', 9);
+
+    $otherWorkspace = Workspace::factory()->create(['name' => 'Other workspace']);
+    $otherUser = User::factory()->create(['email' => 'other-stats-owner@example.com']);
+    $otherWorkspace->members()->attach($otherUser->id, ['role' => 'owner']);
+
+    $otherLink = Link::factory()->forDomain($domain)->create([
+        'workspace_id' => $otherWorkspace->id,
+        'slug' => 'exportstats2',
+        'destination' => 'https://example.com/other-stats',
+        'expires_at' => null,
+    ]);
+
+    $this->seedDailyStats($otherLink->id, EXPORT_STATS_DAY, 9, 9);
+
+    Sanctum::actingAs($user, ['me:read']);
+
+    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.EXPORT_PATH);
+    $response->assertOk();
+
+    $body = $response->json();
+
+    expect($body['statistics'])->toHaveCount(1);
+
+    $statistics = $body['statistics'][0];
+
+    expect(personalDataExportSortedKeys($statistics))
+        ->toBe(['daily', 'devices', 'link_id', 'weekly']);
+
+    expect($statistics['link_id'])->toBe($link->public_id);
+
+    expect($statistics['daily'])->toHaveCount(1);
+    expect(personalDataExportSortedKeys($statistics['daily'][0]))
+        ->toBe(['clicks', 'date', 'uniques']);
+    expect($statistics['daily'][0]['date'])->toBe(EXPORT_STATS_DAY)
+        ->and($statistics['daily'][0]['clicks'])->toBe(5)
+        ->and($statistics['daily'][0]['uniques'])->toBe(3);
+
+    expect($statistics['weekly'])->toHaveCount(1);
+    expect(personalDataExportSortedKeys($statistics['weekly'][0]))
+        ->toBe(['iso_week', 'iso_year', 'uniques']);
+    expect($statistics['weekly'][0]['iso_year'])->toBe(2026)
+        ->and($statistics['weekly'][0]['iso_week'])->toBe(47)
+        ->and($statistics['weekly'][0]['uniques'])->toBe(4);
+
+    expect($statistics['devices'])->toHaveCount(1);
+    expect(personalDataExportSortedKeys($statistics['devices'][0]))
+        ->toBe(['clicks', 'device']);
+    expect($statistics['devices'][0]['device'])->toBe('mobile')
+        ->and($statistics['devices'][0]['clicks'])->toBe(9);
+
+    $exportedLinks = array_column($body['statistics'], 'link_id');
+
+    expect($exportedLinks)->toBe([$link->public_id]);
+
+    $keys = personalDataExportJsonKeys($body);
+
+    foreach (['country', 'ip', 'user_agent', 'referer'] as $forbidden) {
+        expect($keys)->not->toContain($forbidden);
+    }
+});
+
+it('drops the weekly buckets older than the retention window from the export', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-03-01 10:00:00', 'UTC'));
+    config(['analytics.retention_days' => 30]);
+
+    ['user' => $user, 'link' => $link] = personalDataExportStatsFixture(
+        'Retained workspace',
+        'retained-owner@example.com',
+        'exportretained1',
+        'https://example.com/export-retained',
+    );
+
+    // The retained window opens on 2026-01-31, in ISO week 5: W4 is out.
+    $this->seedWeeklyStats($link->id, 2026, 4, 7);
+    $this->seedWeeklyStats($link->id, 2026, 5, 8);
+    $this->seedWeeklyStats($link->id, 2026, 6, 9);
+    $this->seedDailyStats($link->id, '2026-02-15', 4, 2);
+
+    Sanctum::actingAs($user, ['me:read']);
+
+    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.EXPORT_PATH);
+    $response->assertOk();
+
+    $weekly = $response->json('statistics.0.weekly');
+
+    $buckets = collect($weekly)
+        ->map(fn (array $week): string => $week['iso_year'].'-W'.$week['iso_week'])
+        ->sort()
+        ->values()
+        ->all();
+
+    expect($buckets)->toBe(['2026-W5', '2026-W6']);
 });

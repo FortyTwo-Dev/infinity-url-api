@@ -1,11 +1,14 @@
 <?php
 
+use App\Casts\EncryptedWithHash;
 use App\Models\User;
 use App\Services\EmailHasher;
+use Illuminate\Support\Facades\Crypt;
 use Tests\TestCase;
 
 const ENCRYPTED_HASH_EMAIL = 'user@example.com';
 const ENCRYPTED_HASH_SECOND_EMAIL = 'second@example.com';
+const ENCRYPTED_HASH_NEW_EMAIL = 'new@example.com';
 
 uses(TestCase::class);
 
@@ -63,4 +66,44 @@ it('writes null for the ciphertext and the hash when the email is null', functio
         ->and($attributes['email'])->toBeNull()
         ->and($attributes['email_hash'])->toBeNull()
         ->and($user->email)->toBeNull();
+});
+
+it('rewrites an attribute that cannot be decrypted', function () {
+    $attributes = (new EncryptedWithHash)->set(
+        new User,
+        'email',
+        ENCRYPTED_HASH_NEW_EMAIL,
+        ['email' => 'not-a-ciphertext'],
+    );
+
+    expect($attributes['email'])->toBeString();
+    expect(Crypt::decryptString($attributes['email']))->toBe(ENCRYPTED_HASH_NEW_EMAIL);
+    expect($attributes['email_hash'])->toBe(app(EmailHasher::class)->hash(ENCRYPTED_HASH_NEW_EMAIL));
+});
+
+it('compares plaintexts rather than ciphertexts', function () {
+    $cast = new EncryptedWithHash;
+    $user = new User;
+
+    $first = Crypt::encryptString('same@example.com');
+    $second = Crypt::encryptString('same@example.com');
+
+    expect($cast->compare($user, 'email', $first, $second))->toBeTrue();
+    expect($cast->compare(
+        $user,
+        'email',
+        Crypt::encryptString('a@example.com'),
+        Crypt::encryptString('b@example.com'),
+    ))->toBeFalse();
+});
+
+it('compares nulls and undecryptable values', function () {
+    $cast = new EncryptedWithHash;
+    $user = new User;
+    $ciphertext = Crypt::encryptString('a@example.com');
+
+    expect($cast->compare($user, 'email', null, null))->toBeTrue();
+    expect($cast->compare($user, 'email', null, $ciphertext))->toBeFalse();
+    expect($cast->compare($user, 'email', $ciphertext, null))->toBeFalse();
+    expect($cast->compare($user, 'email', 'not-a-ciphertext', $ciphertext))->toBeFalse();
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use Carbon\CarbonImmutable;
+use LogicException;
 
 final readonly class RedirectResult
 {
@@ -13,11 +14,15 @@ final readonly class RedirectResult
         public ?string $location = null,
         public ?string $reason = null,
         public ?CarbonImmutable $expiresAt = null,
+        public ?int $linkId = null,
     ) {}
 
-    public static function redirect(string $location, ?CarbonImmutable $expiresAt = null): self
-    {
-        return new self(302, $location, null, $expiresAt);
+    public static function redirect(
+        string $location,
+        ?CarbonImmutable $expiresAt = null,
+        ?int $linkId = null,
+    ): self {
+        return new self(302, $location, null, $expiresAt, $linkId);
     }
 
     public static function notFound(): self
@@ -43,11 +48,22 @@ final readonly class RedirectResult
     public function isValid(): bool
     {
         return match ($this->status) {
-            302 => $this->hasValidLocation(),
+            // A cached 302 without a link id cannot feed the analytics job and
+            // is treated as a miss: the next click reloads it from Postgres.
+            302 => $this->hasValidLocation() && $this->linkId !== null,
             410 => $this->reason === 'deleted' || $this->reason === 'expired',
             403, 404 => true,
             default => false,
         };
+    }
+
+    public function locationOrFail(): string
+    {
+        if ($this->location === null) {
+            throw new LogicException('A redirect response requires a location.');
+        }
+
+        return $this->location;
     }
 
     private function hasValidLocation(): bool
@@ -77,6 +93,10 @@ final readonly class RedirectResult
             $payload['reason'] = $this->reason;
         }
 
+        if ($this->linkId !== null) {
+            $payload['link_id'] = $this->linkId;
+        }
+
         return $payload;
     }
 
@@ -93,11 +113,14 @@ final readonly class RedirectResult
 
         $location = $payload['location'] ?? null;
         $reason = $payload['reason'] ?? null;
+        $linkId = $payload['link_id'] ?? null;
 
         return new self(
             $status,
             is_string($location) ? $location : null,
             is_string($reason) ? $reason : null,
+            null,
+            is_int($linkId) ? $linkId : null,
         );
     }
 }

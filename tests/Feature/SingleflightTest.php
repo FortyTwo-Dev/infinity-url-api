@@ -50,7 +50,36 @@ it('performs a single links read for one hundred concurrent cold requests', func
     // does not try to autoload a class that only exists in the parent suite.
     $tasks = array_fill(0, 100, Closure::bind($task, null, null));
 
-    $results = Concurrency::run($tasks);
+    // Children inherit the process environment. Queue the click instead of
+    // running it inline on the synchronous queue: the measured invariant is the
+    // redirect path, and the job executes in a worker in production.
+    $environment = [
+        $_ENV['QUEUE_CONNECTION'] ?? null,
+        $_SERVER['QUEUE_CONNECTION'] ?? null,
+        getenv('QUEUE_CONNECTION') ?: null,
+    ];
+
+    $_ENV['QUEUE_CONNECTION'] = 'redis';
+    $_SERVER['QUEUE_CONNECTION'] = 'redis';
+    putenv('QUEUE_CONNECTION=redis');
+
+    try {
+        $results = Concurrency::run($tasks);
+    } finally {
+        if ($environment[0] === null) {
+            unset($_ENV['QUEUE_CONNECTION']);
+        } else {
+            $_ENV['QUEUE_CONNECTION'] = $environment[0];
+        }
+
+        if ($environment[1] === null) {
+            unset($_SERVER['QUEUE_CONNECTION']);
+        } else {
+            $_SERVER['QUEUE_CONNECTION'] = $environment[1];
+        }
+
+        putenv($environment[2] === null ? 'QUEUE_CONNECTION' : 'QUEUE_CONNECTION='.$environment[2]);
+    }
 
     $statuses = array_column($results, 'status');
     $reads = array_sum(array_column($results, 'reads'));
