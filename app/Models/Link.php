@@ -24,6 +24,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $destination
  * @property LinkStatus $status
  * @property CarbonImmutable|null $expires_at
+ * @property CarbonImmutable|null $review_required_at
+ * @property string|null $review_reason
  */
 #[ObservedBy(LinkObserver::class)]
 #[Fillable([

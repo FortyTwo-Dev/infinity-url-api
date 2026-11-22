@@ -35,6 +35,8 @@
         <env name="DB_PASSWORD" value="secret"/>
         <env name="DB_URL" value=""/>
         <env name="LINK_HOST" value="iurl.fr"/>
+        <env name="ABUSE_CHECK_ENABLED" value="false"/>
+        <env name="SIGNUPS_OPEN" value="true"/>
         <env name="LINK_URL" value=""/>
         <env name="REDIS_DB" value="2"/>
         <env name="REDIS_CACHE_DB" value="2"/>

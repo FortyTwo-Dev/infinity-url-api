@@ -114,6 +114,30 @@ final class ProblemException extends RuntimeException
         );
     }
 
+    public static function destinationBlocked(?string $detail = null): self
+    {
+        return new self(
+            422,
+            'destination_blocked',
+            'Destination blocked',
+            $detail === null
+                ? 'The destination is blocked.'
+                : 'The destination is blocked: '.$detail,
+        );
+    }
+
+    public static function destinationPrivateAddress(?string $detail = null): self
+    {
+        return new self(
+            422,
+            'destination_private_address',
+            'Private address not allowed',
+            $detail === null
+                ? 'The destination points to a private, loopback or metadata address.'
+                : 'The destination points to a private address: '.$detail,
+        );
+    }
+
     public static function notFound(): self
     {
         return new self(
