@@ -78,19 +78,27 @@ final class PublicSuffix
         $this->loaded = true;
         $path = $this->path();
 
-        if (! is_file($path)) {
-            report(new \RuntimeException('Public suffix list missing at '.$path));
+        $this->rules = is_file($path) ? $this->load($path) : $this->missing($path);
 
-            return $this->rules = null;
-        }
+        return $this->rules;
+    }
 
+    private function load(string $path): ?Rules
+    {
         try {
-            return $this->rules = Rules::fromPath($path);
+            return Rules::fromPath($path);
         } catch (Throwable $exception) {
             report($exception);
 
-            return $this->rules = null;
+            return null;
         }
+    }
+
+    private function missing(string $path): null
+    {
+        report(new \RuntimeException('Public suffix list missing at '.$path));
+
+        return null;
     }
 
     private function fallback(string $host): ?string

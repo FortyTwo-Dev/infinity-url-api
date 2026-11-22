@@ -22,51 +22,41 @@ final class LinkTarget
 
     public static function parse(string $value, string $defaultHost): ?self
     {
-        $value = trim($value);
-
-        if ($value === '') {
-            return null;
-        }
-
-        $host = $defaultHost;
-        $slug = $value;
-
-        if (str_starts_with($value, '//')) {
-            $value = 'https:'.$value;
-        }
-
-        if (str_contains($value, '://')) {
-            $parts = parse_url($value);
-
-            if (! is_array($parts) || ! isset($parts['host'], $parts['path'])) {
-                return null;
-            }
-
-            $host = (string) $parts['host'];
-            $slug = trim((string) $parts['path'], '/');
-
-            if (str_contains($slug, '/')) {
-                return null;
-            }
-        } elseif (str_contains($value, '/')) {
-            [$candidateHost, $candidateSlug] = explode('/', $value, 2);
-
-            if ($candidateHost === '' || str_contains($candidateSlug, '/')) {
-                return null;
-            }
-
-            $host = $candidateHost;
-            $slug = $candidateSlug;
-        }
+        [$host, $slug] = self::split(trim($value), $defaultHost);
 
         $host = strtolower(rtrim(trim($host), '.'));
         $slug = trim($slug);
 
-        if (! self::validHost($host) || preg_match(self::SLUG, $slug) !== 1) {
-            return null;
+        return self::validHost($host) && preg_match(self::SLUG, $slug) === 1
+            ? new self($host, strtolower($slug))
+            : null;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private static function split(string $value, string $defaultHost): array
+    {
+        $value = str_starts_with($value, '//') ? 'https:'.$value : $value;
+
+        if (str_contains($value, '://')) {
+            $parts = parse_url($value);
+            $parts = is_array($parts) ? $parts : [];
+            $slug = trim((string) ($parts['path'] ?? ''), '/');
+
+            return [
+                (string) ($parts['host'] ?? ''),
+                str_contains($slug, '/') ? '' : $slug,
+            ];
         }
 
-        return new self($host, strtolower($slug));
+        if (str_contains($value, '/')) {
+            [$host, $slug] = explode('/', $value, 2);
+
+            return [$host, str_contains($slug, '/') ? '' : $slug];
+        }
+
+        return [$defaultHost, $value];
     }
 
     private static function validHost(string $host): bool

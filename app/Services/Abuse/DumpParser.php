@@ -47,26 +47,27 @@ final class DumpParser
     private function host(string $line): ?string
     {
         // Some feeds prefix a URL with a comment tag: "123456 http://…".
-        $line = preg_replace('/^\S+\s+(?=\w+:\/\/)/', '', $line) ?? $line;
+        $line = trim((string) preg_replace('/^\S+\s+(?=\w+:\/\/)/', '', $line));
 
-        if (str_contains($line, '://')) {
-            $host = parse_url($line, PHP_URL_HOST);
+        return str_contains($line, '://')
+            ? $this->urlHost($line)
+            : $this->bareHost($line);
+    }
 
-            return is_string($host) && $host !== '' ? strtolower($host) : null;
-        }
+    private function urlHost(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
 
+        return is_string($host) && $host !== '' ? strtolower($host) : null;
+    }
+
+    private function bareHost(string $line): ?string
+    {
         $host = preg_split('/[\s\/?#]/', $line)[0] ?? '';
-
-        if ($host === '' || str_contains($host, '@')) {
-            return null;
-        }
-
         $host = explode(':', $host)[0] ?? '';
 
-        if ($host === '' || filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            return null;
-        }
-
-        return strtolower(rtrim($host, '.'));
+        return $host === '' || str_contains($host, '@') || filter_var($host, FILTER_VALIDATE_IP) !== false
+            ? null
+            : strtolower(rtrim($host, '.'));
     }
 }

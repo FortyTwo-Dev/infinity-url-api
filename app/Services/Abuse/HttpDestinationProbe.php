@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Abuse;
 
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -27,50 +28,78 @@ final class HttpDestinationProbe
     {
         $redirects = 0;
         $current = $url;
-        $maximum = (int) config('abuse.http.max_redirects', 3);
+        $result = null;
 
-        while (true) {
-            $target = $this->target($current);
+        while ($result === null) {
+            $step = $this->step($current, $redirects);
 
-            if ($target === null) {
-                return new ProbeResult(0, $redirects);
-            }
-
-            if (($target['private'] ?? false) === true) {
-                return new ProbeResult(0, $redirects, true);
-            }
-
-            try {
-                $response = $this->request($target['host'], $target['port'], $target['address'])
-                    ->head($current);
-
-                if (in_array($response->status(), [400, 403, 405, 501], true)) {
-                    $response = $this->request($target['host'], $target['port'], $target['address'])
-                        ->withHeaders(['Range' => 'bytes=0-'.((int) config('abuse.http.range_bytes', 65_536) - 1)])
-                        ->get($current);
-                }
-            } catch (Throwable $exception) {
-                report($exception);
-
-                return new ProbeResult(0, $redirects);
-            }
-
-            $location = $response->header('Location');
-
-            if ($response->redirect() && is_string($location) && $location !== '') {
+            if (is_string($step)) {
+                $current = $step;
                 $redirects++;
-
-                if ($redirects >= $maximum) {
-                    return new ProbeResult($response->status(), $redirects, false, $target['address']);
-                }
-
-                $current = $this->resolve($current, $location);
 
                 continue;
             }
 
-            return new ProbeResult($response->status(), $redirects, false, $target['address']);
+            $result = $step;
         }
+
+        return $result;
+    }
+
+    /**
+     * One hop: either a final result, or the next URL to follow.
+     */
+    private function step(string $url, int $redirects): ProbeResult|string
+    {
+        $target = $this->target($url);
+
+        if ($target === null || ($target['private'] ?? false) === true) {
+            return new ProbeResult(0, $redirects, $target !== null);
+        }
+
+        $response = $this->send($url, $target);
+
+        return $response === null
+            ? new ProbeResult(0, $redirects)
+            : $this->outcome($url, $response, $redirects, $target['address']);
+    }
+
+    /**
+     * @param  array{host: string, port: int, address: string}  $target
+     */
+    private function send(string $url, array $target): ?Response
+    {
+        try {
+            $response = $this->request($target['host'], $target['port'], $target['address'])
+                ->head($url);
+
+            if (in_array($response->status(), [400, 403, 405, 501], true)) {
+                $response = $this->request($target['host'], $target['port'], $target['address'])
+                    ->withHeaders(['Range' => 'bytes=0-'.((int) config('abuse.http.range_bytes', 65_536) - 1)])
+                    ->get($url);
+            }
+
+            return $response;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
+    }
+
+    private function outcome(string $url, Response $response, int $redirects, string $address): ProbeResult|string
+    {
+        $location = $response->header('Location');
+
+        if (! $response->redirect() || ! is_string($location) || $location === '') {
+            return new ProbeResult($response->status(), $redirects, false, $address);
+        }
+
+        if ($redirects + 1 >= (int) config('abuse.http.max_redirects', 3)) {
+            return new ProbeResult($response->status(), $redirects + 1, false, $address);
+        }
+
+        return $this->resolve($url, $location);
     }
 
     /**
@@ -79,29 +108,14 @@ final class HttpDestinationProbe
     private function target(string $url): ?array
     {
         $parts = parse_url($url);
+        $parts = is_array($parts) ? $parts : [];
 
-        if (! is_array($parts)) {
-            return null;
-        }
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = strtolower((string) ($parts['host'] ?? ''));
 
-        $scheme = strtolower($parts['scheme'] ?? '');
-        $host = strtolower($parts['host'] ?? '');
-
-        if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
-            return null;
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            return $this->private->isPrivate($host)
-                ? ['private' => true]
-                : ['host' => $host, 'port' => $this->port($parts, $scheme), 'address' => $host];
-        }
-
-        // CURLOPT_RESOLVE is indexed by the ASCII hostname.
-        $asciiHost = idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
-        $pinnedHost = is_string($asciiHost) && $asciiHost !== '' ? $asciiHost : $host;
-
-        $addresses = $this->resolver->addresses($pinnedHost);
+        $addresses = in_array($scheme, ['http', 'https'], true) && $host !== ''
+            ? $this->addresses($host)
+            : [];
 
         if ($addresses === []) {
             return null;
@@ -112,10 +126,32 @@ final class HttpDestinationProbe
         }
 
         return [
-            'host' => $pinnedHost,
+            'host' => $this->asciiHost($host),
             'port' => $this->port($parts, $scheme),
             'address' => $addresses[0],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function addresses(string $host): array
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return [$host];
+        }
+
+        return $this->resolver->addresses($this->asciiHost($host));
+    }
+
+    /**
+     * CURLOPT_RESOLVE and DNS answers are indexed by the ASCII hostname.
+     */
+    private function asciiHost(string $host): string
+    {
+        $ascii = idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+
+        return is_string($ascii) && $ascii !== '' ? $ascii : $host;
     }
 
     /**
@@ -123,9 +159,11 @@ final class HttpDestinationProbe
      */
     private function port(array $parts, string $scheme): int
     {
-        return is_int($parts['port'] ?? null)
-            ? $parts['port']
-            : ($scheme === 'https' ? 443 : 80);
+        if (is_int($parts['port'] ?? null)) {
+            return $parts['port'];
+        }
+
+        return $scheme === 'https' ? 443 : 80;
     }
 
     private function request(string $host, int $port, string $address): PendingRequest
@@ -153,28 +191,27 @@ final class HttpDestinationProbe
         }
 
         $parts = parse_url($base);
+        $parts = is_array($parts) ? $parts : [];
 
-        if (! is_array($parts)) {
-            return $location;
-        }
-
-        $scheme = strtolower($parts['scheme'] ?? 'http');
+        $scheme = strtolower((string) ($parts['scheme'] ?? 'http'));
         $origin = $scheme.'://'.($parts['host'] ?? '').(isset($parts['port']) ? ':'.$parts['port'] : '');
 
-        if (str_starts_with($location, '//')) {
-            return $scheme.':'.$location;
+        return match (true) {
+            str_starts_with($location, '//') => $scheme.':'.$location,
+            str_starts_with($location, '/') => $origin.$location,
+            default => $origin.$this->directory((string) ($parts['path'] ?? '/')).$location,
+        };
+    }
+
+    private function directory(string $path): string
+    {
+        if (str_ends_with($path, '/')) {
+            return $path;
         }
 
-        if (str_starts_with($location, '/')) {
-            return $origin.$location;
-        }
-
-        $path = $parts['path'] ?? '/';
         $position = strrpos($path, '/');
-        $directory = str_ends_with($path, '/')
-            ? $path
-            : substr($path, 0, $position === false ? 1 : $position + 1);
+        $directory = substr($path, 0, $position === false ? 1 : $position + 1);
 
-        return $origin.($directory === '' ? '/' : $directory).$location;
+        return $directory === '' ? '/' : $directory;
     }
 }

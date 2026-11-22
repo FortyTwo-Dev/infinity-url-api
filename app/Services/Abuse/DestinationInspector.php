@@ -34,10 +34,7 @@ final class DestinationInspector
         }
 
         $parts = parse_url($destination);
-
-        if (! is_array($parts)) {
-            return DestinationAssessment::accept();
-        }
+        $parts = is_array($parts) ? $parts : [];
 
         $scheme = strtolower((string) ($parts['scheme'] ?? ''));
         $host = strtolower(trim((string) ($parts['host'] ?? ''), '[]'));
@@ -46,7 +43,13 @@ final class DestinationInspector
             return DestinationAssessment::accept();
         }
 
+        return $this->assess($destination, $scheme, $host, (string) ($parts['path'] ?? ''));
+    }
+
+    private function assess(string $destination, string $scheme, string $host, string $path): DestinationAssessment
+    {
         $registrable = $this->suffix->registrable($host);
+        $brand = $this->brands->match($host);
         /** @var array<string, mixed> $signals */
         $signals = [
             'registrable' => $registrable,
@@ -54,6 +57,17 @@ final class DestinationInspector
             'tls_age_days' => null,
         ];
 
+        // Blocking signals are local and cheap: they must stop before RDAP.
+        return $this->blocking($host, $brand, $signals)
+            ?? $this->brandAndAge($host, $registrable, $brand, $path, $signals)
+            ?? $this->network($destination, $scheme, $host, $signals);
+    }
+
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function blocking(string $host, ?BrandMatch $brand, array $signals): ?DestinationAssessment
+    {
         if ($this->blocklist->hits($host)) {
             return DestinationAssessment::block(
                 'blocklist',
@@ -61,8 +75,6 @@ final class DestinationInspector
                 $signals,
             );
         }
-
-        $brand = $this->brands->match($host);
 
         if ($brand?->isBlocking() === true) {
             return DestinationAssessment::block(
@@ -72,44 +84,87 @@ final class DestinationInspector
             );
         }
 
-        $sensitive = $this->hasSensitivePath((string) ($parts['path'] ?? ''));
+        return null;
+    }
 
-        if ($brand !== null || $sensitive) {
-            $signals['domain_age_days'] = $this->rdap->ageDays($registrable);
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function brandAndAge(
+        string $host,
+        ?string $registrable,
+        ?BrandMatch $brand,
+        string $path,
+        array $signals,
+    ): ?DestinationAssessment {
+        $sensitive = $this->hasSensitivePath($path);
+
+        if ($brand === null && ! $sensitive) {
+            return $this->heuristics($host, $registrable, $signals);
         }
 
-        $young = $this->isYoung($signals['domain_age_days']);
+        $age = $this->rdap->ageDays($registrable);
+        $signals['domain_age_days'] = $age;
 
-        if ($brand?->kind === BrandMatch::TYPOSQUAT) {
-            if ($young) {
-                return DestinationAssessment::block(
-                    $brand->reason(),
-                    $this->describe($brand).' The domain was registered '
-                        .$signals['domain_age_days'].' day(s) ago.',
-                    $signals,
-                );
-            }
+        return $this->brandVerdict($brand, $age, $signals)
+            ?? $this->youngVerdict($sensitive, $age, $signals)
+            ?? $this->heuristics($host, $registrable, $signals);
+    }
 
-            return DestinationAssessment::review($brand->reason(), $signals);
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function brandVerdict(?BrandMatch $brand, ?int $age, array $signals): ?DestinationAssessment
+    {
+        if ($brand?->kind !== BrandMatch::TYPOSQUAT) {
+            return null;
         }
 
-        if ($sensitive && $young) {
-            return DestinationAssessment::review('young_domain_login_path', $signals);
+        if ($this->isYoung($age)) {
+            return DestinationAssessment::block(
+                $brand->reason(),
+                $this->describe($brand).' The domain was registered '.$age.' day(s) ago.',
+                $signals,
+            );
         }
 
+        return DestinationAssessment::review($brand->reason(), $signals);
+    }
+
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function youngVerdict(bool $sensitive, ?int $age, array $signals): ?DestinationAssessment
+    {
+        return $sensitive && $this->isYoung($age)
+            ? DestinationAssessment::review('young_domain_login_path', $signals)
+            : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function heuristics(string $host, ?string $registrable, array $signals): ?DestinationAssessment
+    {
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
             return $this->private->isPrivate($host)
                 ? DestinationAssessment::block('private_address', 'it points to a private or reserved address.', $signals)
                 : DestinationAssessment::review('ip_literal', $signals);
         }
 
-        $labels = $this->suffix->labels($host);
-        $extraLabels = count($labels) - count($this->suffix->labels((string) $registrable));
+        $extraLabels = count($this->suffix->labels($host))
+            - count($this->suffix->labels((string) $registrable));
 
-        if ($extraLabels > (int) config('abuse.max_subdomains', 3)) {
-            return DestinationAssessment::review('many_subdomains:'.$extraLabels, $signals);
-        }
+        return $extraLabels > (int) config('abuse.max_subdomains', 3)
+            ? DestinationAssessment::review('many_subdomains:'.$extraLabels, $signals)
+            : null;
+    }
 
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function network(string $destination, string $scheme, string $host, array $signals): DestinationAssessment
+    {
         $addresses = $this->resolver->addresses($host);
 
         if ($addresses === []) {
@@ -126,28 +181,38 @@ final class DestinationInspector
             );
         }
 
+        return $this->probed($destination, $scheme, $host, $signals);
+    }
+
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function probed(string $destination, string $scheme, string $host, array $signals): DestinationAssessment
+    {
         $probe = $this->probe->probe($destination);
 
-        if ($probe->privateHop) {
-            return DestinationAssessment::block(
-                'private_address',
-                'a redirection points to a private, loopback or metadata address.',
-                $signals,
-            );
+        if ($probe->privateHop || ! $probe->reachable()) {
+            return $probe->privateHop
+                ? DestinationAssessment::block(
+                    'private_address',
+                    'a redirection points to a private, loopback or metadata address.',
+                    $signals,
+                )
+                : DestinationAssessment::accept($signals + ['http' => 'unreachable']);
         }
 
-        if (! $probe->reachable()) {
-            $signals['http'] = 'unreachable';
+        return $probe->redirects >= (int) config('abuse.http.max_redirects', 3)
+            ? DestinationAssessment::review('redirect_chain:'.$probe->redirects, $signals)
+            : $this->accepted($scheme, $host, $probe->address, $signals);
+    }
 
-            return DestinationAssessment::accept($signals);
-        }
-
-        if ($probe->redirects >= (int) config('abuse.http.max_redirects', 3)) {
-            return DestinationAssessment::review('redirect_chain:'.$probe->redirects, $signals);
-        }
-
-        if ($scheme === 'https' && $probe->address !== null) {
-            $issued = $this->tls->issuedAt($host, $probe->address);
+    /**
+     * @param  array<string, mixed>  $signals
+     */
+    private function accepted(string $scheme, string $host, ?string $address, array $signals): DestinationAssessment
+    {
+        if ($scheme === 'https' && $address !== null) {
+            $issued = $this->tls->issuedAt($host, $address);
 
             if ($issued !== null) {
                 $signals['tls_age_days'] = max(0, (int) $issued->diffInDays(now('UTC')));
@@ -157,9 +222,9 @@ final class DestinationInspector
         return DestinationAssessment::accept($signals);
     }
 
-    private function isYoung(mixed $age): bool
+    private function isYoung(?int $age): bool
     {
-        return is_int($age) && $age < (int) config('abuse.young_domain_days', 30);
+        return $age !== null && $age < (int) config('abuse.young_domain_days', 30);
     }
 
     private function hasSensitivePath(string $path): bool

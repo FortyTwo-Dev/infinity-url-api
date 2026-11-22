@@ -29,18 +29,21 @@ final class DumpFetcher
             $response = $this->request($config['auth_key'] ?? null)
                 ->get((string) $config['url']);
 
-            if (! $response->successful()) {
-                report(new \RuntimeException('Abuse dump '.$source.' answered '.$response->status()));
-
-                return null;
-            }
-
-            return preg_split('/\r\n|\r|\n/', $response->body()) ?: [];
+            return $response->successful()
+                ? (preg_split('/\r\n|\r|\n/', $response->body()) ?: [])
+                : $this->failed($source, $response->status());
         } catch (Throwable $exception) {
             report($exception);
 
             return null;
         }
+    }
+
+    private function failed(string $source, int $status): null
+    {
+        report(new \RuntimeException('Abuse dump '.$source.' answered '.$status));
+
+        return null;
     }
 
     private function request(?string $authKey): PendingRequest

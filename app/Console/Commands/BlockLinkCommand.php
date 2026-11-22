@@ -8,6 +8,7 @@ use App\Actions\Abuse\BlockLink;
 use App\Models\Link;
 use App\Models\Report;
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 
 final class BlockLinkCommand extends Command
 {
@@ -20,46 +21,32 @@ final class BlockLinkCommand extends Command
 
     public function handle(BlockLink $action): int
     {
+        try {
+            $this->block($action);
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function block(BlockLink $action): void
+    {
         $reason = trim((string) $this->option('reason'));
 
         if ($reason === '') {
-            $this->error('A motive is required: --reason="..."');
-
-            return self::FAILURE;
+            throw new InvalidArgumentException('A motive is required: --reason="..."');
         }
 
-        $identifier = (string) $this->argument('link');
-
-        $link = Link::withTrashed()
-            ->where('public_id', $identifier)
-            ->first()
-            ?? Link::withTrashed()->where('slug', strtolower($identifier))->first();
-
-        if ($link === null) {
-            $this->error('Link not found: '.$identifier);
-
-            return self::FAILURE;
-        }
+        $link = $this->link((string) $this->argument('link'));
 
         if ($link->trashed()) {
-            $this->error('This link is deleted: blocking it would change nothing.');
-
-            return self::FAILURE;
+            throw new InvalidArgumentException('This link is deleted: blocking it would change nothing.');
         }
 
-        $report = null;
-        $reportId = $this->option('report');
-
-        if (is_string($reportId) && $reportId !== '') {
-            $report = Report::query()->where('public_id', $reportId)->first();
-
-            if ($report === null) {
-                $this->error('Report not found: '.$reportId);
-
-                return self::FAILURE;
-            }
-        }
-
+        $report = $this->report();
         $action->handle($link, $reason, $report);
 
         $this->info('Link '.$link->public_id.' blocked.');
@@ -67,7 +54,25 @@ final class BlockLinkCommand extends Command
         if ($report !== null) {
             $this->info('Report '.$report->public_id.' marked as actioned.');
         }
+    }
 
-        return self::SUCCESS;
+    private function link(string $identifier): Link
+    {
+        $link = Link::withTrashed()->where('public_id', $identifier)->first()
+            ?? Link::withTrashed()->where('slug', strtolower($identifier))->first();
+
+        return $link ?? throw new InvalidArgumentException('Link not found: '.$identifier);
+    }
+
+    private function report(): ?Report
+    {
+        $identifier = $this->option('report');
+
+        if (! is_string($identifier) || $identifier === '') {
+            return null;
+        }
+
+        return Report::query()->where('public_id', $identifier)->first()
+            ?? throw new InvalidArgumentException('Report not found: '.$identifier);
     }
 }

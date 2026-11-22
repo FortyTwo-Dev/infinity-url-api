@@ -32,10 +32,11 @@ final class BrandMatcher
 
         $registrable = $this->suffix->registrable($ascii);
 
-        if ($registrable === null) {
-            return null;
-        }
+        return $registrable === null ? null : $this->matchRegistrable($ascii, $registrable);
+    }
 
+    private function matchRegistrable(string $host, string $registrable): ?BrandMatch
+    {
         // The table gives the most citable reason: a known homoglyph of a
         // protected brand is quoted by name, not as "mixed scripts".
         $lookalike = LookalikeDomain::query()->find($registrable);
@@ -44,11 +45,11 @@ final class BrandMatcher
             return BrandMatch::typosquat($lookalike->brand_domain, $lookalike->variant_type);
         }
 
-        if ($this->scripts->isMixed($ascii)) {
+        if ($this->scripts->isMixed($host)) {
             return BrandMatch::mixedScripts();
         }
 
-        return $this->subdomain($ascii, $registrable);
+        return $this->subdomain($host, $registrable);
     }
 
     private function subdomain(string $host, string $registrable): ?BrandMatch
@@ -60,8 +61,19 @@ final class BrandMatcher
             return null;
         }
 
-        $before = array_slice($labels, 0, count($labels) - $registrableLabels);
+        return $this->brandIn(
+            array_slice($labels, 0, count($labels) - $registrableLabels),
+            $labels,
+            $registrable,
+        );
+    }
 
+    /**
+     * @param  list<string>  $before  the labels left of the registrable domain
+     * @param  list<string>  $labels  every label of the host
+     */
+    private function brandIn(array $before, array $labels, string $registrable): ?BrandMatch
+    {
         foreach ($this->brands() as $brand) {
             $brandDomain = strtolower($brand->domain);
 
@@ -73,13 +85,9 @@ final class BrandMatcher
                 continue;
             }
 
-            if ($brandDomain === $registrable) {
-                continue;
-            }
-
             $brandLabel = explode('.', $brandDomain)[0] ?? '';
 
-            if ($brandLabel !== '' && in_array($brandLabel, $before, true)) {
+            if ($brandDomain !== $registrable && $brandLabel !== '' && in_array($brandLabel, $before, true)) {
                 return BrandMatch::subdomain($brandDomain);
             }
         }
@@ -97,11 +105,8 @@ final class BrandMatcher
     {
         $brandLabels = explode('.', $brandDomain);
 
-        if (count($labels) <= count($brandLabels)) {
-            return false;
-        }
-
-        return array_slice($labels, 0, count($brandLabels)) === $brandLabels;
+        return count($labels) > count($brandLabels)
+            && array_slice($labels, 0, count($brandLabels)) === $brandLabels;
     }
 
     /**

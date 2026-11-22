@@ -11,20 +11,22 @@ namespace App\Services\Abuse;
  */
 final class PrivateAddress
 {
+    // NOSONAR on each line below: these are documented reserved ranges to
+    // reject, not endpoints to contact.
     private const RANGES = [
-        '0.0.0.0/8',
-        '10.0.0.0/8',
-        '100.64.0.0/10',
-        '127.0.0.0/8',
-        '169.254.0.0/16',
-        '172.16.0.0/12',
-        '192.168.0.0/16',
-        '224.0.0.0/4',
-        '240.0.0.0/4',
-        '::/128',
-        '::1/128',
-        'fc00::/7',
-        'fe80::/10',
+        '0.0.0.0/8', // NOSONAR
+        '10.0.0.0/8', // NOSONAR
+        '100.64.0.0/10', // NOSONAR
+        '127.0.0.0/8', // NOSONAR
+        '169.254.0.0/16', // NOSONAR
+        '172.16.0.0/12', // NOSONAR
+        '192.168.0.0/16', // NOSONAR
+        '224.0.0.0/4', // NOSONAR
+        '240.0.0.0/4', // NOSONAR
+        '::/128', // NOSONAR
+        '::1/128', // NOSONAR
+        'fc00::/7', // NOSONAR
+        'fe80::/10', // NOSONAR
     ];
 
     public function isPrivate(string $address): bool

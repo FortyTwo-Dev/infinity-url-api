@@ -239,24 +239,16 @@ final class BrandVariants
 
     private function ascii(string $domain): ?string
     {
-        if (! str_contains($domain, '.')) {
-            return null;
-        }
+        $ascii = str_contains($domain, '.')
+            ? idn_to_ascii($domain, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46)
+            : false;
 
-        $ascii = idn_to_ascii($domain, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+        $ascii = is_string($ascii) && $ascii !== '' ? strtolower($ascii) : null;
+        $invalid = $ascii === null || array_filter(
+            explode('.', $ascii),
+            static fn (string $label): bool => $label === '' || strlen($label) > 63,
+        ) !== [];
 
-        if (! is_string($ascii) || $ascii === '') {
-            return null;
-        }
-
-        $ascii = strtolower($ascii);
-
-        foreach (explode('.', $ascii) as $label) {
-            if ($label === '' || strlen($label) > 63) {
-                return null;
-            }
-        }
-
-        return $ascii;
+        return $invalid ? null : $ascii;
     }
 }

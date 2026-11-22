@@ -54,35 +54,38 @@ final class RdapClient
                 ->acceptJson()
                 ->get(rtrim($base, '/').'/'.$registrable);
 
-            if (! $response->successful()) {
-                return null;
-            }
-
-            /** @var array<string, mixed> $payload */
-            $payload = $response->json();
-            $events = $payload['events'] ?? [];
-
-            if (! is_array($events)) {
-                return null;
-            }
-
-            foreach ($events as $event) {
-                if (! is_array($event) || ($event['eventAction'] ?? null) !== 'registration') {
-                    continue;
-                }
-
-                $date = $event['eventDate'] ?? null;
-
-                if (! is_string($date) || $date === '') {
-                    continue;
-                }
-
-                $registered = CarbonImmutable::parse($date)->utc();
-
-                return max(0, (int) $registered->diffInDays(CarbonImmutable::now('UTC')));
-            }
+            return $response->successful()
+                ? $this->ageFrom($response->json())
+                : null;
         } catch (Throwable $exception) {
             report($exception);
+
+            return null;
+        }
+    }
+
+    private function ageFrom(mixed $payload): ?int
+    {
+        $events = is_array($payload) ? ($payload['events'] ?? []) : [];
+
+        if (! is_array($events)) {
+            return null;
+        }
+
+        foreach ($events as $event) {
+            if (! is_array($event) || ($event['eventAction'] ?? null) !== 'registration') {
+                continue;
+            }
+
+            $date = $event['eventDate'] ?? null;
+
+            if (! is_string($date) || $date === '') {
+                continue;
+            }
+
+            $registered = CarbonImmutable::parse($date)->utc();
+
+            return max(0, (int) $registered->diffInDays(CarbonImmutable::now('UTC')));
         }
 
         return null;

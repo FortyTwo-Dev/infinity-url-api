@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\Api;
 
+const REPORTER_EMAIL = 'reporter@example.com';
+
 beforeEach(function () {
     Http::preventStrayRequests();
     Http::fake();
@@ -138,14 +140,14 @@ it('does not rate limit when the analytics salt is missing', function () {
 });
 
 it('encrypts the optional contact email at rest', function () {
-    $this->postJson(Api::REPORT, reportPayload(['email' => 'reporter@example.com']))
+    $this->postJson(Api::REPORT, reportPayload(['email' => REPORTER_EMAIL]))
         ->assertStatus(202);
 
     $raw = (string) DB::table('reports')->value('contact_email');
 
     expect($raw)->not->toBe('')
-        ->and($raw)->not->toContain('reporter@example.com')
-        ->and(Report::query()->firstOrFail()->contact_email)->toBe('reporter@example.com');
+        ->and($raw)->not->toContain(REPORTER_EMAIL)
+        ->and(Report::query()->firstOrFail()->contact_email)->toBe(REPORTER_EMAIL);
 });
 
 it('stores nothing about the reporter beyond the optional email', function () {
@@ -167,7 +169,7 @@ it('alerts ntfy with the reference and the slug, never the reporter', function (
     $this->postJson(Api::REPORT, reportPayload([
         'slug' => 'known12',
         'details' => 'Received by SMS',
-        'email' => 'reporter@example.com',
+        'email' => REPORTER_EMAIL,
     ]))->assertStatus(202);
 
     Http::assertSent(function (ClientRequest $request): bool {
@@ -175,7 +177,7 @@ it('alerts ntfy with the reference and the slug, never the reporter', function (
 
         return $request->url() === 'https://ntfy.test/iurl-abuse'
             && str_contains($body, 'known12')
-            && ! str_contains($body, 'reporter@example.com')
+            && ! str_contains($body, REPORTER_EMAIL)
             && ! str_contains($body, 'Received by SMS');
     });
 });

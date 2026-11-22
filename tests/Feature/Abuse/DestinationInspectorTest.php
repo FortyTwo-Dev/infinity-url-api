@@ -18,6 +18,8 @@ use Tests\Support\Abuse\FakeDnsResolver;
 use Tests\Support\Abuse\FakeTlsProbe;
 use Tests\Support\Api;
 
+const TYPO_DESTINATION = 'https://leposte.fr/';
+
 /**
  * @return array{0: Workspace, 1: User, 2: Domain, 3: FakeDnsResolver}
  */
@@ -97,7 +99,7 @@ it('sends a typosquat alone to manual review without blocking it', function () {
     fakeRdap(CarbonImmutable::now()->subYears(5));
     fakeTypo();
 
-    $response = $this->postJson(Api::LINKS, ['destination' => 'https://leposte.fr/']);
+    $response = $this->postJson(Api::LINKS, ['destination' => TYPO_DESTINATION]);
 
     $response->assertCreated()
         ->assertJsonPath('status', 'active')
@@ -115,7 +117,7 @@ it('blocks a typosquat on a domain younger than thirty days', function () {
     fakeRdap(CarbonImmutable::now()->subDays(4));
     fakeTypo();
 
-    $this->postJson(Api::LINKS, ['destination' => 'https://leposte.fr/'])
+    $this->postJson(Api::LINKS, ['destination' => TYPO_DESTINATION])
         ->assertStatus(422)
         ->assertJsonPath('code', 'destination_blocked');
 });
@@ -126,7 +128,7 @@ it('blocks a typosquat also present on the blocklist', function () {
     fakeTypo();
     fakeBlocklistDomain('leposte.fr');
 
-    $this->postJson(Api::LINKS, ['destination' => 'https://leposte.fr/'])
+    $this->postJson(Api::LINKS, ['destination' => TYPO_DESTINATION])
         ->assertStatus(422)
         ->assertJsonPath('code', 'destination_blocked');
 });
@@ -236,7 +238,7 @@ it('counts a reviewed link towards the quota', function () {
         'status' => 'active',
     ]);
 
-    $this->postJson(Api::LINKS, ['destination' => 'https://leposte.fr/'])
+    $this->postJson(Api::LINKS, ['destination' => TYPO_DESTINATION])
         ->assertStatus(409)
         ->assertJsonPath('code', 'quota_exceeded');
 });

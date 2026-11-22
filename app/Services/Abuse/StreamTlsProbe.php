@@ -16,6 +16,28 @@ final class StreamTlsProbe implements TlsProbe
 {
     public function issuedAt(string $host, string $address): ?CarbonImmutable
     {
+        $socket = $this->connect($host, $address);
+
+        if ($socket === false) {
+            return null;
+        }
+
+        try {
+            return $this->certificateDate($socket);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return null;
+        } finally {
+            fclose($socket);
+        }
+    }
+
+    /**
+     * @return resource|false
+     */
+    private function connect(string $host, string $address): mixed
+    {
         $timeout = (float) config('abuse.timeouts.tls', 3);
         $target = str_contains($address, ':') ? '['.$address.']' : $address;
         $context = stream_context_create([
@@ -28,7 +50,7 @@ final class StreamTlsProbe implements TlsProbe
             ],
         ]);
 
-        $socket = @stream_socket_client(
+        return @stream_socket_client(
             'tls://'.$target.':443',
             $errorCode,
             $errorMessage,
@@ -36,32 +58,24 @@ final class StreamTlsProbe implements TlsProbe
             STREAM_CLIENT_CONNECT,
             $context,
         );
+    }
 
-        if ($socket === false) {
+    /**
+     * @param  resource  $socket
+     */
+    private function certificateDate(mixed $socket): ?CarbonImmutable
+    {
+        $parameters = stream_context_get_params($socket);
+        $certificate = $parameters['options']['ssl']['peer_certificate'] ?? null;
+
+        if (! is_resource($certificate) && ! is_object($certificate)) {
             return null;
         }
 
-        try {
-            $parameters = stream_context_get_params($socket);
-            $certificate = $parameters['options']['ssl']['peer_certificate'] ?? null;
+        $parsed = openssl_x509_parse($certificate);
 
-            if (! is_resource($certificate) && ! is_object($certificate)) {
-                return null;
-            }
-
-            $parsed = openssl_x509_parse($certificate);
-
-            if (! is_array($parsed) || ! isset($parsed['validFrom_time_t'])) {
-                return null;
-            }
-
-            return CarbonImmutable::createFromTimestampUTC((int) $parsed['validFrom_time_t']);
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return null;
-        } finally {
-            fclose($socket);
-        }
+        return is_array($parsed) && isset($parsed['validFrom_time_t'])
+            ? CarbonImmutable::createFromTimestampUTC((int) $parsed['validFrom_time_t'])
+            : null;
     }
 }
