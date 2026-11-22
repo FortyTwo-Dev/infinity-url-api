@@ -53,6 +53,10 @@ C'est la partie la plus importante du document. Ces tests ne testent pas du code
 | **Aucune ligne pays** | `link_stats_dim` ne contient que des lignes `device` (D-120) | `tests/Feature/Analytics/AnalyticsJobTest.php` |
 | Purge des logs ≤ 72 h | La configuration de journalisation a un plafond dur ≤ 72 h | `tests/Feature/LogRetentionConfigTest.php` |
 | **Aucune route sans ability** | Toute route authentifiée déclare au moins une ability ; un jeton `refresh` ne peut atteindre aucun endpoint | `tests/Architecture/RouteAbilitiesTest.php` |
+| **Signalement sans identifiant** | `POST /v1/report` ne pose aucun cookie, et `reports` ne contient ni IP, ni user-agent, ni referer, ni empreinte de rate limiting | `tests/Feature/Abuse/ReportTest.php` |
+| **`iurl.fr/report` ne compte pas un clic** | `GET /report/{slug}` répond `302` sans corps ni cookie, et aucun job analytique n'est poussé | `tests/Feature/Abuse/ReportRedirectTest.php` |
+| **Pages terminales toujours statiques** | Le lien de signalement ajouté au pied de page reste un `<a href>` : ni script, ni ressource externe, aucune requête sortante | `tests/Feature/ErrorPagePrivacyTest.php` + `ReportRedirectTest` |
+| **Revue interne jamais exposée** | `review_required_at` et `review_reason` sont absents de `LinkResource`, de `GET /me/export` et de toute réponse JSON | `tests/Feature/Abuse/DestinationInspectorTest.php` + `PersonalDataExportTest` |
 
 Le test `NoIpColumnTest` est volontairement brutal : il échoue si quelqu'un ajoute un champ `ip_address` « juste pour déboguer ». C'est exactement le genre d'ajout qui fait mentir un LIA.
 
@@ -100,6 +104,7 @@ Le but est de détecter une régression — un N+1, un cache débranché, un mid
 
 1. **Le parcours qui justifie le produit** : inscription → email capturé par Mailpit → création d'un lien → ouverture dans un nouvel onglet → clic visible dans les statistiques.
 2. **Le parcours API** : création d'un lien avec un token Bearer, vérification de la réponse, des en-têtes de rate limit et de la forme de l'erreur.
+3. **Le parcours de signalement** : `/report?slug=…` → `202` avec une référence, aucun cookie, aucune requête tierce, puis `/abuse` à 360 px. L'API E2E tourne avec `ABUSE_CHECK_ENABLED=false`.
 
 ### 3.4 Contrat de types
 

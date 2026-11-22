@@ -34,11 +34,19 @@ url.infinityproject.fr
 │   ├── /settings/tokens     jetons API
 │   ├── /settings/privacy    export de données
 │   └── /settings/danger     suppression du compte
-├── /report               signalement d'un lien (public, sans compte)
+├── /report               signalement d'un lien (public, SSR, indexable)
+├── /abuse                procédure d'abus, contact, DSA (public, SSR, prerender)
 └── /legal/terms  /legal/privacy  /legal/aup  /legal/notice
 ```
 
-`iurl.fr` ne sert **aucune** de ces pages. Il ne fait que rediriger.
+`iurl.fr` ne sert **aucune** de ces pages. Il ne fait que rediriger, sauf
+`GET /report/{slug}` qui répond `302` vers `/report?slug=…` : une redirection de
+service, sans corps ni cookie, jamais comptée comme un clic.
+
+`/report` et `/abuse` sont les deux **seules** pages publiques rendues côté
+serveur (`routeRules`), avec un layout public séparé : pas de shell authentifié,
+pas de capability, et un `robots: index, follow` qui surcharge le `noindex`
+global. Le dashboard et l'authentification restent en SPA.
 
 ---
 
@@ -133,6 +141,22 @@ Trois règles d'interface, qui sont des règles de confidentialité :
 
 Le pied de page de `403`, `404` et `410` pointe ici, avec le slug déjà rempli. C'est le seul chemin où la victime est déjà sur notre domaine.
 
+### `/abuse`
+
+| Champ | Valeur |
+| --- | --- |
+| Rôle | Expliquer la procédure d'abus et le canal de contact, sans compte |
+| Action principale | « Signaler un lien » vers `/report` |
+| Données | procédure (accusé sous 24 h ouvrées, qualification sous 48 h, retrait immédiat si malveillant), contact `abuse@iurl.fr`, obligations DSA, lien vers `/report` |
+| État vide | Sans objet : page de contenu |
+| État erreur | Aucun appel réseau : page statique, rien à échouer |
+| Chargement | Aucun : page prérendue |
+| Capability | **Aucune** : page publique, sans compte, sans cookie |
+| i18n | `abuse.page.*` |
+
+Aucun texte de politique d'usage acceptable : l'AUP est rédigée et validée en
+S6. Cette page est opérationnelle, pas contractuelle.
+
 ---
 
 ## 3. Écrans secondaires
@@ -149,6 +173,7 @@ Le pied de page de `403`, `404` et `410` pointe ici, avec le slug déjà rempli.
 | `/settings/privacy` | Export de portabilité | « Télécharger mes données » | — | `settings.privacy.*` |
 | `/settings/danger` | Supprimer le compte | « Supprimer définitivement » | — | `settings.danger.*` |
 | `/report` | Signaler un lien | « Signaler » | — | `abuse.report.*` |
+| `/abuse` | Procédure d'abus | « Signaler un lien » | — | `abuse.page.*` |
 | `/legal/*` | Mentions, CGU, AUP, confidentialité | aucun | — | `legal.*` |
 
 Le secret d'un jeton API n'est affiché **qu'une fois**, à la création, avec une

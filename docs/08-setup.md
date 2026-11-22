@@ -393,6 +393,37 @@ Les alertes partent vers ntfy par webhook. Grafana **n'est pas exposé publiquem
 
 **Les métriques sont des agrégats** : aucune donnée personnelle, aucun impact sur le LIA. C'est ce qui permet de les garder 15 jours sans contradiction avec la rétention des logs.
 
+### 10.3 Abus : réglages et tâches planifiées
+
+| Variable | Rôle | Défaut |
+| --- | --- | --- |
+| `SIGNUPS_OPEN` | Kill switch des inscriptions (D-66) | `false` en production, `true` en local |
+| `ABUSE_CHECK_ENABLED` | Vérification de destination à la création | `true` ; `false` seulement pour l'E2E |
+| `PSL_PATH` | Liste des suffixes publics | `resources/psl/public_suffix_list.dat` |
+| `URLHAUS_URL`, `URLHAUS_AUTH_KEY` | Dump quotidien d'abuse.ch | URL publique, clé gratuite |
+| `PHISHING_ARMY_URL`, `OPENPHISH_URL` | Dumps de phishing | URLs publiques |
+| `RDAP_URL` | Âge du domaine, domaine enregistrable seul | `https://rdap.org/domain/` |
+| `NTFY_URL` | Sujet d'alerte auto-hébergé | vide : aucune alerte, jamais un échec |
+| `ABUSE_DUMP_PATH` | Cache local des dumps | `storage/app/abuse` |
+
+Aucun paquet supplémentaire : les alertes partent par le client HTTP de
+Laravel, ce qui les rend testables avec `Http::fake` sans réseau.
+
+| Commande | Fréquence | Effet |
+| --- | --- | --- |
+| `abuse:refresh-blocklists` | Quotidien, 04:10 UTC | Dumps complets, `upsert` avec fusion des sources, purge > 30 jours |
+| `abuse:propose-brands` | Hebdomadaire, lundi 04:40 UTC | Propositions issues des dumps, jamais appliquées seules |
+| `abuse:monitor-reputation` | Quotidien, 05:00 UTC | `iurl.fr` et domaines clients contre la blocklist locale, alerte ntfy |
+| `abuse:purge-reports` | Quotidien, 03:30 UTC | 12 mois, 90 jours pour un signalement rejeté |
+
+Import initial des marques, une fois par environnement :
+
+```sh
+php artisan abuse:import-brands
+php artisan abuse:rebuild-lookalikes
+php artisan abuse:review-queue        # file de revue, lecture seule
+```
+
 ---
 
 ## 12. Durcissement du serveur
@@ -417,10 +448,10 @@ Les alertes partent vers ntfy par webhook. Grafana **n'est pas exposé publiquem
 4. `reserved_slugs` semé, test de collision avec les routes qui passe.
 5. Un compte administrateur créé à la main, inscriptions publiques encore fermées (`SIGNUPS_OPEN=false`).
 6. Envoi d'un email de vérification réel, en-têtes SPF/DKIM/DMARC validés.
-7. Job de blocklist exécuté une fois, table non vide.
+7. `abuse:refresh-blocklists` exécuté une fois, table non vide ; `abuse:import-brands` puis `abuse:rebuild-lookalikes` exécutés ; `abuse:review-queue` répond.
 8. Rotation du sel testée à blanc : l'ancien sel n'est plus lisible après.
 9. Sauvegarde effectuée, **restauration chronométrée** dans une base jetable.
-10. Une alerte de test arrive bien sur ntfy.
+10. Une alerte de test arrive bien sur ntfy, et `abuse:monitor-reputation` n'envoie rien quand aucun domaine n'est listé.
 11. Purge des logs vérifiée à 72 h (simulation).
 12. `curl -sI https://iurl.fr/<slug>` : aucun `Set-Cookie`, aucun script, `302`.
 13. Ouverture des inscriptions.
