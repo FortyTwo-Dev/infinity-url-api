@@ -123,11 +123,21 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "include",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "clicks_7d"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`clicks_7d` is present only when the include parameter asks for it.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -135,7 +145,57 @@
                                     "properties": {
                                         "data": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "slug": {
+                                                        "type": "string"
+                                                    },
+                                                    "destination": {
+                                                        "type": "string"
+                                                    },
+                                                    "short_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "status": {
+                                                        "type": "string"
+                                                    },
+                                                    "expires_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "created_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "updated_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "clicks_7d": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "slug",
+                                                    "destination",
+                                                    "short_url",
+                                                    "status",
+                                                    "expires_at",
+                                                    "created_at",
+                                                    "updated_at"
+                                                ]
+                                            }
                                         },
                                         "next_cursor": {
                                             "type": [

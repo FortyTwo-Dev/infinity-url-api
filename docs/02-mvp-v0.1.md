@@ -58,14 +58,17 @@ L'ordre est dicté par le risque, pas par la dépendance technique. **Les domain
 | S4 — Dashboard | Liste, création, édition, page de stats (un graphique suffit), **export CSV**, QR via `@infinitylib/iqrcode-wasm` | 26–34 h |
 | S5 — Abus | **Score de destination à trois issues** (blocklist, RDAP, TLS, redirections) ; **typosquat déterministe** (liste courte sourcée, variantes précalculées, sous-domaine, scripts mélangés) ; **job de découverte de marques** ; motif citable ; `POST /report` anonyme ; `iurl.fr/report/{slug}` ; **page `/abuse`** ; takedown ; kill switch ; AUP | 22–28 h |
 | S6 — Légal et docs | CGU, AUP, politique de confidentialité, page sous-traitants, clause client, LIA, README, quickstart self-host | 16–24 h |
+| S7 — Réorganisation et validation de l'interface | *(dépôt `infinity-url`)* Inventaire des écrans v0.1, vocabulaire de layout et découpage CSS sur le thème partagé, primitives réutilisables, quatre états, accessibilité, QA 360 px et 1280 px, ADR `0004-ui-organization`. Aucun changement d'API ni de comportement | 8–12 h |
 
-**Total : 137–192 h.** À 8–10 h par semaine : **3 à 4 mois**. Avec une marge de sécurité réaliste, compter 4 à 5 mois.
+**Total : 145–204 h.** À 8–10 h par semaine : **3,5 à 6 mois**. Avec une marge de sécurité réaliste, compter 4 à 6 mois.
+
+**S7 ne crée aucun écran.** Elle réorganise et valide ceux de S4 à S6 — dashboard, réglages, signalement, pages légales, marketing — **une fois l'inventaire complet**, et c'est elle qui ferme la v0.1. Elle ne doit pas être ouverte avant que le dernier écran v0.1 du dashboard (les réglages) soit implémenté. Aucun second design system, aucune dépendance ajoutée, aucun changement de contrat HTTP : si la passe révèle un défaut, elle le corrige avec les tests de l'écran concerné. Elle est terminée quand tous les écrans partagent le même vocabulaire de layout, les quatre états, le FR/EN, le rendu à 360 px, l'accessibilité clavier et les contrastes, et quand `docs/14-ecrans.md`, l'ADR et l'inventaire UI sont à jour.
 
 Le rate limiting de la redirection et des 404 est assuré par **Traefik**, pas par l'application : aucun coût sur le chemin chaud, et aucune empreinte d'IP en base ni en cache applicatif. Il se configure à l'étape S3, avec le pipeline analytique.
 
 **Seul inconnu technique de S0** : le chargement du binaire `.wasm` sous Vite/Nuxt. Le paquet est construit avec `wasm-pack --target web`, ce qui exporte un module ESM dont la fonction `init()` doit être appelée avant usage, et dont le `.wasm` est résolu à l'exécution. C'est un détail de configuration Vite, pas un obstacle — mais c'est le genre de chose qui coûte une soirée si elle est découverte en S5. D'où le spike de 30 minutes en S0.
 
-Si le calendrier doit être tenu à 4 mois, la seule coupe acceptable est le **QR** (S5 partiel) : il est agréable mais ne conditionne ni l'inscription ni le paiement futur. Les domaines custom, eux, ne se coupent pas.
+Si le calendrier doit être tenu, la seule coupe acceptable est le **QR** (S5 partiel) : il est agréable mais ne conditionne ni l'inscription ni le paiement futur. Les domaines custom, eux, ne se coupent pas. S7 n'est pas une coupe : c'est la passe qui déclare l'interface terminée.
 
 ---
 
@@ -79,6 +82,7 @@ La v0.1 est terminée quand, dans cet ordre :
 4. Les pages légales sont publiées et la clause client est copiable depuis la documentation.
 5. Le fichier `LICENSE` est correct, le champ `license` est renseigné dans les deux manifestes, et le lien « Source » est présent dans le footer.
 6. Une sauvegarde a été restaurée avec succès au moins une fois, chronométrée.
+7. L'interface a été réorganisée et validée (S7) : un vocabulaire de layout unique, les quatre états, le FR/EN, le rendu à 360 px, l'accessibilité clavier et les contrastes, sans requête tierce ni jeton persistant.
 
 ---
 
