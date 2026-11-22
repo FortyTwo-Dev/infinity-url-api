@@ -14,6 +14,14 @@ final class SystemDnsResolver implements DnsResolver
             return [];
         }
 
+        // DNS answers are indexed by the ASCII form: a legitimate IDN still
+        // has to resolve and be checked like any other destination.
+        $ascii = idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+
+        if (is_string($ascii) && $ascii !== '') {
+            $host = $ascii;
+        }
+
         $addresses = [];
 
         /** @var list<string>|false $v4 */

@@ -97,7 +97,11 @@ final class HttpDestinationProbe
                 : ['host' => $host, 'port' => $this->port($parts, $scheme), 'address' => $host];
         }
 
-        $addresses = $this->resolver->addresses($host);
+        // CURLOPT_RESOLVE is indexed by the ASCII hostname.
+        $asciiHost = idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+        $pinnedHost = is_string($asciiHost) && $asciiHost !== '' ? $asciiHost : $host;
+
+        $addresses = $this->resolver->addresses($pinnedHost);
 
         if ($addresses === []) {
             return null;
@@ -108,7 +112,7 @@ final class HttpDestinationProbe
         }
 
         return [
-            'host' => $host,
+            'host' => $pinnedHost,
             'port' => $this->port($parts, $scheme),
             'address' => $addresses[0],
         ];
