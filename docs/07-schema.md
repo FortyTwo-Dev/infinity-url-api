@@ -49,6 +49,10 @@ create table users (
     totp_secret       text,
     totp_confirmed_at timestamptz,
 
+    -- Suspension d'abus : bloque la création de liens, jamais la connexion
+    -- ni l'export (docs/04 §4.3).
+    suspended_at      timestamptz,
+
     created_at        timestamptz not null default now(),
     updated_at        timestamptz not null default now(),
     deleted_at        timestamptz
@@ -181,6 +185,12 @@ create table links (
                 check (status in ('active','disabled','blocked')),
     expires_at  timestamptz,
     created_by  bigint references users(id) on delete set null,
+
+    -- Revue manuelle (D-128) : internes, jamais sérialisés, jamais exportés.
+    -- Le lien reste actif : une revue n'est pas un blocage.
+    review_required_at timestamptz,
+    review_reason      text,
+
     created_at  timestamptz not null default now(),
     updated_at  timestamptz not null default now(),
     deleted_at  timestamptz,
@@ -196,6 +206,10 @@ create index links_workspace_created on links (workspace_id, created_at desc);
 -- Pour le job d'expiration : ne scanne que les liens concernés.
 create index links_expiring on links (expires_at)
     where status = 'active' and deleted_at is null;
+
+-- File de revue manuelle (D-128) : ne contient que les liens signalés.
+create index links_review_queue on links (review_required_at)
+    where review_required_at is not null;
 ```
 
 **Point clé** : l'index unique porte sur *toutes* les lignes, y compris `deleted_at is not null`. C'est ce qui rend le `410 Gone` permanent sans code applicatif supplémentaire.
@@ -312,19 +326,24 @@ La vérification se fait à la **création du lien** uniquement. Jamais au clic 
 
 ```sql
 create table protected_brands (
-    brand       text not null,              -- 'La Poste'
-    domain      text not null,              -- 'laposte.fr'
-    category    text not null,              -- 'bank','telco','delivery','government','marketplace'
-    source      text not null,              -- 'seed','phishing-dump','report'
-    verified_at timestamptz not null default now(),
-    primary key (domain)
+    domain     text primary key,             -- 'laposte.fr'
+    category   text not null,                -- 'bank','telco','delivery','government','marketplace',…
+    type       text not null default 'registrable'
+               check (type in ('registrable','hostname')),
+                                             -- 'registrable' : variantes sur le domaine
+                                             -- 'hostname'    : comparaison du nom d'hôte complet
+    source     text not null default 'seed', -- 'seed','phishing-dump','report'
+    checked_at date not null                 -- dernière vérification humaine
 );
 
 create table lookalike_domains (
     domain       text primary key,          -- variante générée
     brand_domain text not null,             -- la marque imitée
-    variant_type text not null              -- 'substitution','deletion','homoglyph','tld','combosquat','concatenation'
+    variant_type text not null              -- 'substitution','deletion','insertion','transposition',
+                                            -- 'homoglyph','tld','combosquat','concatenation'
 );
+
+create index lookalike_domains_brand on lookalike_domains (brand_domain);
 
 -- Pas de table de popularité : le rang mesure les liens entrants, pas la
 -- fiabilité, et double l'âge du domaine (D-133). Le Majestic Million a servi
@@ -343,6 +362,12 @@ create table brand_proposals (
     unique (token, window_from, window_to)
 );
 ```
+
+Le seed est `resources/brands/brands.seed.csv` : 46 entrées vérifiées, pas
+davantage. `type` distingue une marque sur son domaine enregistrable
+(`laposte.fr`) d'un service public sur un sous-domaine (`impots.gouv.fr`) : les
+variantes ne se génèrent pas de la même façon. Aucun rang de popularité n'est
+stocké (D-133).
 
 Le second est **généré**, jamais saisi à la main : un job le reconstruit à chaque mise à jour de la liste. Quelques centaines de milliers de lignes, une clé primaire, donc une requête par création de lien et rien d'autre.
 

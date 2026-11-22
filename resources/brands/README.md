@@ -8,7 +8,7 @@
 | Colonne | Rôle |
 | --- | --- |
 | `domain` | Le motif protégé : un domaine enregistrable, ou un nom d'hôte complet |
-| `category` | `banque`, `telecom`, `livraison`, `gouvernement`, `commerce`, `sante`, `transport`, `media`, `paiement`, `tech` |
+| `category` | `bank`, `telco`, `delivery`, `government`, `marketplace`, `health`, `transport`, `media`, `payment`, `tech` |
 | `type` | `registrable` (variantes sur le domaine) ou `hostname` (comparaison du nom d'hôte complet, ex. `impots.gouv.fr`) |
 | `source` | `seed`, `phishing-dump` ou `report` |
 | `checked_at` | Date de la dernière vérification humaine |

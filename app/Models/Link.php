@@ -35,6 +35,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'status',
     'expires_at',
     'created_by',
+    'review_required_at',
+    'review_reason',
 ])]
 class Link extends Model
 {
@@ -49,6 +51,7 @@ class Link extends Model
         return [
             'status' => LinkStatus::class,
             'expires_at' => 'immutable_datetime',
+            'review_required_at' => 'immutable_datetime',
         ];
     }
 
