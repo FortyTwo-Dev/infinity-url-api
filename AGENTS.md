@@ -86,6 +86,7 @@ la précédente soit verte.
 | S4 | *(dépôt `infinity-url`)* Dashboard et QR | hors périmètre de ce dépôt |
 | S5 | Abus | score de destination, `POST /report`, takedown |
 | S6 | Légal et docs | pages publiées, quickstart self-host vérifié |
+| S7 | *(dépôt `infinity-url`)* Réorganisation et validation de l'interface | vocabulaire de layout unique, quatre états, FR/EN, 360 px, accessibilité, docs à jour |
 
 La numérotation est celle de `docs/02-mvp-v0.1.md` : une seule liste, pour les deux
 dépôts. Ne pas la renuméroter ici.

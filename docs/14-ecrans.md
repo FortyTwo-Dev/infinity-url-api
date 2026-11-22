@@ -57,7 +57,9 @@ url.infinityproject.fr
 | Capability | `links:read` |
 | i18n | `links.list.*` |
 
-Recherche `?q=` (2 caractères minimum), filtre par statut, tri par date ou clics.
+Recherche `?q=` (2 caractères minimum), filtre par statut, tri par date. Le tri
+par clics est différé (ADR-0003) : l'API ne trie que par date et `clicks_7d`
+est calculé par page.
 
 ### `/links/new`
 
@@ -65,7 +67,7 @@ Recherche `?q=` (2 caractères minimum), filtre par statut, tri par date ou clic
 | --- | --- |
 | Rôle | Créer un lien |
 | Action principale | « Créer » |
-| Données | destination (URL), slug custom (optionnel), domaine (liste), expiration (optionnelle) |
+| Données | destination (URL), slug custom (optionnel), domaine (`iurl.fr` uniquement en v0.1, D-127), expiration (optionnelle) |
 | État vide | Sans objet |
 | État erreur | Erreurs champ par champ depuis `errors`, plus le code global |
 | Chargement | Bouton désactivé avec libellé « Création… » |
@@ -184,3 +186,7 @@ Un écran est terminé quand :
 4. il n'y a aucun jeton en stockage persistant ;
 5. il n'y a aucune requête tierce vérifiable dans l'onglet réseau ;
 6. il fonctionne à 360 px de large sans action inaccessible.
+
+La réorganisation et la validation finales (S7) reprennent ces critères sur
+l'ensemble des écrans v0.1 ; aucun écran n'est déclaré terminé avant cette
+passe, qui ferme la v0.1.
