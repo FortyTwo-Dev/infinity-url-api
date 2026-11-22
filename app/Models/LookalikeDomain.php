@@ -12,6 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A precomputed variant of a protected brand. `variant_type` is what makes the
  * reason citable: "one letter away from laposte.fr", never "suspicious domain".
+ *
+ * @property string $domain
+ * @property string $brand_domain
+ * @property LookalikeVariant $variant_type
  */
 #[Fillable(['domain', 'brand_domain', 'variant_type'])]
 class LookalikeDomain extends Model

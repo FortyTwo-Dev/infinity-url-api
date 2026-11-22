@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Exceptions\UnsupportedCacheRepositoryException;
 use App\Models\PersonalAccessToken;
+use App\Services\Abuse\PublicSuffix;
 use App\Services\Analytics\AnalyticsSalt;
 use App\Services\Analytics\PendingClicks;
 use App\Services\EmailHasher;
@@ -30,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(AnalyticsSalt::class);
         $this->app->singleton(PendingClicks::class);
+        $this->app->singleton(PublicSuffix::class);
 
         $this->app->bind(Repository::class, function (Application $app): Repository {
             $repository = $app->make(CacheRepository::class);

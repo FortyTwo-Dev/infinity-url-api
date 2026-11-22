@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\PostgresArray;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -33,7 +34,7 @@ class BlocklistDomain extends Model
     protected function casts(): array
     {
         return [
-            'sources' => 'array',
+            'sources' => PostgresArray::class,
             'first_seen' => 'immutable_date',
             'last_seen' => 'immutable_date',
         ];

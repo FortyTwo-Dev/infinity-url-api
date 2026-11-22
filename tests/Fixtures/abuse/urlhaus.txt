@@ -1,0 +1,4 @@
+# URLhaus text dump — fixture
+https://evil.example.co.uk/payload.exe
+http://192.168.1.10/malware
+https://bad.test/login
