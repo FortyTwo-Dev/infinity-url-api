@@ -62,6 +62,26 @@ final class ProblemException extends RuntimeException
         );
     }
 
+    public static function accountSuspended(): self
+    {
+        return new self(
+            403,
+            'account_suspended',
+            'Account suspended',
+            'This account is suspended: creating a link is not allowed.',
+        );
+    }
+
+    public static function signupsClosed(): self
+    {
+        return new self(
+            403,
+            'signups_closed',
+            'Signups closed',
+            'New accounts are closed right now.',
+        );
+    }
+
     public static function linkBlocked(): self
     {
         return new self(

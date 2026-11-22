@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\HasPublicId;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * It carries what the reporter typed and nothing about the reporter: no
  * address, no agent, no referrer, no rate-limit fingerprint. The contact email
  * is optional, encrypted at rest and never indexed (docs/04 §4.1 bis).
+ *
+ * @property string $public_id
+ * @property string $state
+ * @property string|null $resolution
+ * @property CarbonImmutable|null $created_at
+ * @property CarbonImmutable|null $resolved_at
  */
 #[Fillable([
     'public_id',

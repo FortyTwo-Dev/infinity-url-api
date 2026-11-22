@@ -38,6 +38,10 @@ final class CreateLink
             throw ProblemException::emailUnverified();
         }
 
+        if ($user->isSuspended()) {
+            throw ProblemException::accountSuspended();
+        }
+
         // The inspection runs before the transaction and before the quota: a
         // blocked destination is a validation failure, not a quota failure.
         $assessment = $this->inspector->inspect((string) $data['destination']);

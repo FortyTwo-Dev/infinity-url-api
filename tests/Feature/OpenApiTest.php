@@ -69,6 +69,7 @@ it('declares security for authenticated operations and none for public ones', fu
         '/auth/logout',
         '/auth/password/forgot',
         '/auth/password/reset',
+        '/report',
     ];
 
     $routes = collect(Route::getRoutes()->getRoutes())->filter(function ($route): bool {

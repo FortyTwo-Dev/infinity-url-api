@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Auth;
 
+use App\Exceptions\ProblemException;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\EmailHasher;
@@ -17,6 +18,10 @@ final class RegisterUser
 
     public function handle(string $email, string $password): void
     {
+        if (! (bool) config('identity.signups_open', false)) {
+            throw ProblemException::signupsClosed();
+        }
+
         $existing = User::withTrashed()
             ->where('email_hash', EmailHasher::hash($email))
             ->first();
