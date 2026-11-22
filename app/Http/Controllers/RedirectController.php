@@ -13,7 +13,6 @@ use App\Support\RedirectResult;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use LogicException;
 
 final class RedirectController extends Controller
 {
@@ -48,14 +47,10 @@ final class RedirectController extends Controller
 
     private function redirect(RedirectResult $result): Response
     {
-        if ($result->location === null) {
-            throw new LogicException('A redirect response requires a location.');
-        }
-
         $response = response('', 302);
 
         $response->headers = new NoStoreHeaderBag([
-            'Location' => $result->location,
+            'Location' => $result->locationOrFail(),
             'Cache-Control' => 'no-store',
             'Referrer-Policy' => 'no-referrer',
             'X-Robots-Tag' => 'noindex',

@@ -33,49 +33,63 @@ final class AnalyticsSalt
         $path = $this->path();
         clearstatcache(true, $path);
 
+        $stamp = $this->stamp($path);
+
+        if ($stamp === null) {
+            return $this->forget();
+        }
+
+        if ($this->memo !== null && $this->stamp === $stamp) {
+            return $this->memo;
+        }
+
+        return $this->reload($path, $stamp);
+    }
+
+    /**
+     * @return array{path: string, mtime: int, inode: int, ctime: int, size: int}|null
+     */
+    private function stamp(string $path): ?array
+    {
         $stat = @stat($path);
 
         if ($stat === false) {
-            $this->memo = null;
-            $this->stamp = null;
-
             return null;
         }
 
-        $stamp = [
+        return [
             'path' => $path,
             'mtime' => (int) $stat['mtime'],
             'inode' => (int) $stat['ino'],
             'ctime' => (int) $stat['ctime'],
             'size' => (int) $stat['size'],
         ];
+    }
 
-        if ($this->memo !== null && $this->stamp === $stamp) {
-            return $this->memo;
-        }
-
+    /**
+     * @param  array{path: string, mtime: int, inode: int, ctime: int, size: int}  $stamp
+     */
+    private function reload(string $path, array $stamp): ?string
+    {
         $content = @file_get_contents($path);
-
-        if (! is_string($content)) {
-            $this->memo = null;
-            $this->stamp = null;
-
-            return null;
-        }
-
-        $content = trim($content);
+        $content = is_string($content) ? trim($content) : '';
 
         if ($content === '') {
-            $this->memo = null;
-            $this->stamp = null;
-
-            return null;
+            return $this->forget();
         }
 
         $this->memo = $content;
         $this->stamp = $stamp;
 
         return $content;
+    }
+
+    private function forget(): null
+    {
+        $this->memo = null;
+        $this->stamp = null;
+
+        return null;
     }
 
     public function read(): string

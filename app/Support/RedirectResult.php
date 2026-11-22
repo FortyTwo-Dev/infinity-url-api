@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use Carbon\CarbonImmutable;
+use LogicException;
 
 final readonly class RedirectResult
 {
@@ -54,6 +55,15 @@ final readonly class RedirectResult
             403, 404 => true,
             default => false,
         };
+    }
+
+    public function locationOrFail(): string
+    {
+        if ($this->location === null) {
+            throw new LogicException('A redirect response requires a location.');
+        }
+
+        return $this->location;
     }
 
     private function hasValidLocation(): bool

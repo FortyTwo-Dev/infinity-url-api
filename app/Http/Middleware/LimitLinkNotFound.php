@@ -27,19 +27,22 @@ final class LimitLinkNotFound
     {
         $response = $next($request);
 
-        if ($response->getStatusCode() !== 404) {
+        return $response->getStatusCode() === 404
+            ? $this->limited($request, $response)
+            : $response;
+    }
+
+    private function limited(Request $request, Response $response): Response
+    {
+        $salt = $this->salt->current();
+
+        // Without the salt there is no fingerprint contract: fail open rather
+        // than hash under a permanent secret such as APP_KEY.
+        if ($salt === null) {
             return $response;
         }
 
         try {
-            $salt = $this->salt->current();
-
-            // Without the salt there is no fingerprint contract: fail open
-            // rather than hash under a permanent secret such as APP_KEY.
-            if ($salt === null) {
-                return $response;
-            }
-
             $key = 'link404:'.hash_hmac('sha256', (string) $request->ip(), $salt);
 
             if (RateLimiter::tooManyAttempts($key, $this->limit())) {
