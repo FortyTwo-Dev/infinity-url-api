@@ -26,17 +26,30 @@ final class DumpFetcher
         }
 
         try {
-            $response = $this->request($config['auth_key'] ?? null)
-                ->get((string) $config['url']);
-
-            return $response->successful()
-                ? (preg_split('/\r\n|\r|\n/', $response->body()) ?: [])
-                : $this->failed($source, $response->status());
+            return $this->download($config, $source);
         } catch (Throwable $exception) {
             report($exception);
 
             return null;
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return list<string>|null
+     */
+    private function download(array $config, string $source): ?array
+    {
+        $response = $this->request($config['auth_key'] ?? null)
+            ->get((string) $config['url']);
+
+        if (! $response->successful()) {
+            return $this->failed($source, $response->status());
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $response->body());
+
+        return is_array($lines) ? $lines : [];
     }
 
     private function failed(string $source, int $status): null

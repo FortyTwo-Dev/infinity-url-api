@@ -94,12 +94,9 @@ final class PrivateAddress
             return false;
         }
 
-        if ($rest === 0) {
-            return true;
-        }
-
         $mask = 0xFF << (8 - $rest) & 0xFF;
 
-        return (ord($addressBytes[$whole]) & $mask) === (ord($networkBytes[$whole]) & $mask);
+        return $rest === 0
+            || (ord($addressBytes[$whole]) & $mask) === (ord($networkBytes[$whole]) & $mask);
     }
 }
