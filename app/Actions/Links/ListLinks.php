@@ -8,6 +8,7 @@ use App\Models\Link;
 use App\Models\Workspace;
 use App\Support\Cursor;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -25,59 +26,14 @@ final class ListLinks
         $sort = (string) ($filters['sort'] ?? '-created_at');
         $descending = str_starts_with($sort, '-');
 
-        $query = $workspace->links()->with('domain');
-
-        if (isset($filters['domain'])) {
-            $query->whereHas('domain', static function ($domain) use ($filters): void {
-                $domain->where('hostname', $filters['domain']);
-            });
-        }
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['q'])) {
-            $needle = '%'.$filters['q'].'%';
-
-            $query->where(static function ($search) use ($needle): void {
-                $search->where('slug', 'ilike', $needle)
-                    ->orWhere('destination', 'ilike', $needle);
-            });
-        }
-
-        $query->orderBy('created_at', $descending ? 'desc' : 'asc')
-            ->orderBy('id', $descending ? 'desc' : 'asc');
-
-        if (isset($filters['cursor'])) {
-            $cursor = Cursor::decode((string) $filters['cursor']);
-            $created = $cursor['created_at'] ?? null;
-            $id = $cursor['id'] ?? null;
-
-            if (! is_string($created) || ! is_numeric($id)) {
-                throw ValidationException::withMessages([
-                    'cursor' => ['The cursor is invalid.'],
-                ]);
-            }
-
-            try {
-                $createdAt = CarbonImmutable::parse($created);
-            } catch (Throwable) {
-                throw ValidationException::withMessages([
-                    'cursor' => ['The cursor is invalid.'],
-                ]);
-            }
-
-            $operator = $descending ? '<' : '>';
-
-            $query->where(static function ($after) use ($createdAt, $id, $operator): void {
-                $after->where('created_at', $operator, $createdAt)
-                    ->orWhere(static function ($sameDate) use ($createdAt, $id, $operator): void {
-                        $sameDate->where('created_at', $createdAt)
-                            ->where('id', $operator, (int) $id);
-                    });
-            });
-        }
+        $query = $workspace->links()->with('domain')->getQuery();
+        $this->applyFilters($query, $filters);
+        $this->applyOrder($query, $descending);
+        $this->applyCursor(
+            $query,
+            isset($filters['cursor']) ? (string) $filters['cursor'] : null,
+            $descending,
+        );
 
         $links = $query->limit($limit + 1)->get();
         $hasMore = $links->count() > $limit;
@@ -98,6 +54,82 @@ final class ListLinks
             'has_more' => $hasMore,
             'clicks_7d' => $clicks,
         ];
+    }
+
+    /**
+     * @param  Builder<Link>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    private function applyFilters(Builder $query, array $filters): void
+    {
+        if (isset($filters['domain'])) {
+            $query->whereHas('domain', static function ($domain) use ($filters): void {
+                $domain->where('hostname', $filters['domain']);
+            });
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['q'])) {
+            $needle = '%'.$filters['q'].'%';
+
+            $query->where(static function ($search) use ($needle): void {
+                $search->where('slug', 'ilike', $needle)
+                    ->orWhere('destination', 'ilike', $needle);
+            });
+        }
+    }
+
+    /**
+     * @param  Builder<Link>  $query
+     */
+    private function applyOrder(Builder $query, bool $descending): void
+    {
+        $query->orderBy('created_at', $descending ? 'desc' : 'asc')
+            ->orderBy('id', $descending ? 'desc' : 'asc');
+    }
+
+    /**
+     * @param  Builder<Link>  $query
+     */
+    private function applyCursor(
+        Builder $query,
+        ?string $cursor,
+        bool $descending,
+    ): void {
+        if ($cursor === null) {
+            return;
+        }
+
+        $decoded = Cursor::decode($cursor);
+        $created = $decoded['created_at'] ?? null;
+        $id = $decoded['id'] ?? null;
+
+        if (! is_string($created) || ! is_numeric($id)) {
+            throw ValidationException::withMessages([
+                'cursor' => ['The cursor is invalid.'],
+            ]);
+        }
+
+        try {
+            $createdAt = CarbonImmutable::parse($created);
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'cursor' => ['The cursor is invalid.'],
+            ]);
+        }
+
+        $operator = $descending ? '<' : '>';
+
+        $query->where(static function ($after) use ($createdAt, $id, $operator): void {
+            $after->where('created_at', $operator, $createdAt)
+                ->orWhere(static function ($sameDate) use ($createdAt, $id, $operator): void {
+                    $sameDate->where('created_at', $createdAt)
+                        ->where('id', $operator, (int) $id);
+                });
+        });
     }
 
     /**

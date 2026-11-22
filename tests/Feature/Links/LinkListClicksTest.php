@@ -12,6 +12,8 @@ use Tests\Support\Api;
 uses(AnalyticsHelpers::class);
 
 const LINK_LIST_CLICKS_FROZEN_AT = '2026-11-22 10:00:00';
+const LINK_LIST_CLICKS_QUERY = '?include=clicks_7d';
+const LINK_LIST_CLICKS_DAY = '2026-11-22';
 
 beforeEach(function () {
     $this->travelTo(CarbonImmutable::parse(LINK_LIST_CLICKS_FROZEN_AT, 'UTC'));
@@ -58,7 +60,7 @@ it('adds an integer clicks_7d to every item when asked', function () {
     $this->linkOn($workspace, $domain, 'counted2');
     $this->seedDailyStats($counted->id, '2026-11-21', 4, 2);
 
-    $response = $this->getJson(Api::LINKS.'?include=clicks_7d');
+    $response = $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY);
 
     $response->assertOk();
 
@@ -84,9 +86,9 @@ it('sums the seven UTC days ending today and excludes older rows', function () {
 
     $this->seedDailyStats($link->id, '2026-11-15', 100, 50);
     $this->seedDailyStats($link->id, '2026-11-16', 2, 1);
-    $this->seedDailyStats($link->id, '2026-11-22', 3, 2);
+    $this->seedDailyStats($link->id, LINK_LIST_CLICKS_DAY, 3, 2);
 
-    $response = $this->getJson(Api::LINKS.'?include=clicks_7d');
+    $response = $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY);
 
     $response->assertOk();
 
@@ -105,7 +107,7 @@ it('answers zero for a link without daily counters', function () {
 
     $link = $this->linkOn($workspace, $domain, 'noclicks');
 
-    $response = $this->getJson(Api::LINKS.'?include=clicks_7d');
+    $response = $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY);
 
     $response->assertOk();
 
@@ -129,7 +131,7 @@ it('counts only the links of the active workspace', function () {
     $foreign = $this->linkOn($otherWorkspace, $domain, 'foreign1');
     $this->seedDailyStats($foreign->id, '2026-11-20', 100, 50);
 
-    $response = $this->getJson(Api::LINKS.'?include=clicks_7d');
+    $response = $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY);
 
     $response->assertOk();
 
@@ -148,7 +150,7 @@ it('reads the page counters in a single aggregated query', function () {
 
     foreach (['bulk0001', 'bulk0002', 'bulk0003'] as $slug) {
         $link = $this->linkOn($workspace, $domain, $slug);
-        $this->seedDailyStats($link->id, '2026-11-22', 1, 1);
+        $this->seedDailyStats($link->id, LINK_LIST_CLICKS_DAY, 1, 1);
     }
 
     $statements = [];
@@ -159,7 +161,7 @@ it('reads the page counters in a single aggregated query', function () {
         }
     });
 
-    $this->getJson(Api::LINKS.'?include=clicks_7d')->assertOk();
+    $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY)->assertOk();
 
     expect($statements)->toHaveCount(1);
 });
@@ -199,8 +201,8 @@ it('keeps the query filter and the cursor pagination with the include', function
         'created_at' => now()->subMinutes(3),
     ]);
 
-    $this->seedDailyStats($newest->id, '2026-11-22', 1, 1);
-    $this->seedDailyStats($oldest->id, '2026-11-22', 2, 1);
+    $this->seedDailyStats($newest->id, LINK_LIST_CLICKS_DAY, 1, 1);
+    $this->seedDailyStats($oldest->id, LINK_LIST_CLICKS_DAY, 2, 1);
 
     $first = $this->getJson(Api::LINKS.'?'.http_build_query([
         'include' => 'clicks_7d',
@@ -245,7 +247,7 @@ it('keeps the query filter and the cursor pagination with the include', function
 
 it('requires a token to list links with counters', function () {
     $this->assertProblem(
-        $this->getJson(Api::LINKS.'?include=clicks_7d'),
+        $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY),
         401,
         'unauthorized',
     );
@@ -256,7 +258,7 @@ it('requires the links read scope to request counters', function () {
     Sanctum::actingAs($user, ['links:write']);
 
     $this->assertProblem(
-        $this->getJson(Api::LINKS.'?include=clicks_7d'),
+        $this->getJson(Api::LINKS.LINK_LIST_CLICKS_QUERY),
         403,
         'scope_missing',
     );
