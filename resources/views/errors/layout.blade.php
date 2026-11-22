@@ -13,11 +13,17 @@
         h1 { margin: 0 0 1rem; font-size: 1.5rem; }
         p { margin: 0 0 1rem; line-height: 1.5; }
         a { color: #f5c542; }
+        .report { margin-top: 2rem; font-size: 0.875rem; }
     </style>
 </head>
 <body>
     <main>
         @yield('content')
+        @if (! empty($reportUrl))
+            <p class="report">
+                <a href="{{ $reportUrl }}">Signaler ce lien</a>
+            </p>
+        @endif
     </main>
 </body>
 </html>

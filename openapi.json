@@ -1263,6 +1263,71 @@
                 "security": []
             }
         },
+        "/report": {
+            "post": {
+                "operationId": "report",
+                "tags": [
+                    "Report"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreReportRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Always accepted, whether the link exists or not.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "reference": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "reference",
+                                        "status"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
         "/auth/verification/resend": {
             "post": {
                 "operationId": "auth.resendVerification",
@@ -2170,6 +2235,51 @@
                     "destination"
                 ],
                 "title": "StoreLinkRequest"
+            },
+            "StoreReportRequest": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 2048
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "phishing",
+                            "malware",
+                            "other"
+                        ]
+                    },
+                    "details": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "website": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Honeypot: invisible, must stay empty. A filled field is a bot.",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "slug",
+                    "category"
+                ],
+                "title": "StoreReportRequest"
             },
             "StoreTokenRequest": {
                 "type": "object",

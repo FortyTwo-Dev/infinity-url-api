@@ -1,0 +1,3 @@
+# OpenPhish — fixture
+https://evil.example.co.uk/other
+http://phish.example.net/

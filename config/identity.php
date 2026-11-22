@@ -88,6 +88,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Signups
+    |--------------------------------------------------------------------------
+    |
+    | The kill switch of D-66 and docs/04 §7. Closed by default: a production
+    | instance must not open registrations because a variable is missing.
+    |
+    */
+
+    'signups_open' => (bool) env('SIGNUPS_OPEN', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Capabilities
     |--------------------------------------------------------------------------
     |

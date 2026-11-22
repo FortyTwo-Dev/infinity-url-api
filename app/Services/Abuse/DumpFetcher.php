@@ -1,0 +1,70 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Abuse;
+
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Http;
+use Throwable;
+
+/**
+ * One full download of a public dump, once a day. Never a per-URL API call:
+ * no client destination is ever sent to a third party (D-96).
+ */
+final class DumpFetcher
+{
+    /**
+     * @return list<string>|null the raw lines, or null when the download failed
+     */
+    public function fetch(string $source): ?array
+    {
+        $config = config('abuse.sources.'.$source);
+
+        if (! is_array($config) || ! isset($config['url'])) {
+            return null;
+        }
+
+        try {
+            return $this->download($config, $source);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return list<string>|null
+     */
+    private function download(array $config, string $source): ?array
+    {
+        $response = $this->request($config['auth_key'] ?? null)
+            ->get((string) $config['url']);
+
+        if (! $response->successful()) {
+            return $this->failed($source, $response->status());
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $response->body());
+
+        return is_array($lines) ? $lines : [];
+    }
+
+    private function failed(string $source, int $status): null
+    {
+        report(new \RuntimeException('Abuse dump '.$source.' answered '.$status));
+
+        return null;
+    }
+
+    private function request(?string $authKey): PendingRequest
+    {
+        $request = Http::timeout(30)->withHeaders(['Accept' => 'text/plain']);
+
+        return is_string($authKey) && $authKey !== ''
+            ? $request->withHeaders(['Auth-Key' => $authKey])
+            : $request;
+    }
+}

@@ -31,11 +31,11 @@ final class RedirectController extends Controller
 
         $response = match ($result->status) {
             302 => $this->redirect($result),
-            403 => $errors->blocked(),
+            403 => $errors->blocked($slug),
             410 => $result->reason === 'expired'
-                ? $errors->goneExpired()
-                : $errors->goneDeleted(),
-            default => $errors->notFound(),
+                ? $errors->goneExpired($slug)
+                : $errors->goneDeleted($slug),
+            default => $errors->notFound($slug),
         };
 
         if ($result->status === 302) {

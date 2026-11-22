@@ -47,6 +47,8 @@ final class Api
 
     public const LINKS = self::BASE.'/links';
 
+    public const REPORT = self::BASE.'/report';
+
     public const TOKENS = self::BASE.'/tokens';
 
     /**

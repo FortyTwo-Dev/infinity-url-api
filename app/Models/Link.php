@@ -24,6 +24,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $destination
  * @property LinkStatus $status
  * @property CarbonImmutable|null $expires_at
+ * @property CarbonImmutable|null $review_required_at
+ * @property string|null $review_reason
  */
 #[ObservedBy(LinkObserver::class)]
 #[Fillable([
@@ -35,6 +37,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'status',
     'expires_at',
     'created_by',
+    'review_required_at',
+    'review_reason',
 ])]
 class Link extends Model
 {
@@ -49,6 +53,7 @@ class Link extends Model
         return [
             'status' => LinkStatus::class,
             'expires_at' => 'immutable_datetime',
+            'review_required_at' => 'immutable_datetime',
         ];
     }
 

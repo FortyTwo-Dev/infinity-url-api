@@ -11,6 +11,8 @@ use App\Models\Domain;
 use App\Models\Link;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Abuse\DestinationAssessment;
+use App\Services\Abuse\DestinationInspector;
 use App\Services\LinkQuota;
 use App\Services\SlugGenerator;
 use App\Services\SlugRules;
@@ -24,6 +26,7 @@ final class CreateLink
         private readonly SlugGenerator $slugGenerator,
         private readonly SlugRules $slugRules,
         private readonly LinkQuota $quota,
+        private readonly DestinationInspector $inspector,
     ) {}
 
     /**
@@ -35,6 +38,18 @@ final class CreateLink
             throw ProblemException::emailUnverified();
         }
 
+        if ($user->isSuspended()) {
+            throw ProblemException::accountSuspended();
+        }
+
+        // The inspection runs before the transaction and before the quota: a
+        // blocked destination is a validation failure, not a quota failure.
+        $assessment = $this->inspector->inspect((string) $data['destination']);
+
+        if ($assessment->isBlocking()) {
+            throw $this->blocked($assessment);
+        }
+
         $domain = $this->domain();
         $customSlug = $this->customSlug($data);
         $expiresAt = $this->expiresAt($data);
@@ -43,7 +58,14 @@ final class CreateLink
             $this->slugRules->assertAvailable($domain, $customSlug);
         }
 
-        return $this->attempt($workspace, $domain, $customSlug, $data, $user, $expiresAt);
+        return $this->attempt($workspace, $domain, $customSlug, $data, $user, $expiresAt, $assessment);
+    }
+
+    private function blocked(DestinationAssessment $assessment): ProblemException
+    {
+        return $assessment->reason === 'private_address'
+            ? ProblemException::destinationPrivateAddress($assessment->detail)
+            : ProblemException::destinationBlocked($assessment->detail);
     }
 
     private function domain(): Domain
@@ -93,6 +115,7 @@ final class CreateLink
         array $data,
         User $user,
         ?CarbonImmutable $expiresAt,
+        DestinationAssessment $assessment,
     ): Link {
         $attempts = $customSlug === null ? 5 : 1;
 
@@ -100,7 +123,7 @@ final class CreateLink
             $slug = $customSlug ?? $this->slugGenerator->generate($domain);
 
             try {
-                return $this->create($workspace, $domain, $slug, $data, $user, $expiresAt);
+                return $this->create($workspace, $domain, $slug, $data, $user, $expiresAt, $assessment);
             } catch (QueryException $exception) {
                 if (! $this->isDuplicate($exception)) {
                     throw $exception;
@@ -125,8 +148,9 @@ final class CreateLink
         array $data,
         User $user,
         ?CarbonImmutable $expiresAt,
+        DestinationAssessment $assessment,
     ): Link {
-        return DB::transaction(function () use ($workspace, $domain, $slug, $data, $user, $expiresAt): Link {
+        return DB::transaction(function () use ($workspace, $domain, $slug, $data, $user, $expiresAt, $assessment): Link {
             $locked = Workspace::query()
                 ->whereKey($workspace->id)
                 ->lockForUpdate()
@@ -142,6 +166,8 @@ final class CreateLink
                 'status' => LinkStatus::Active,
                 'expires_at' => $expiresAt,
                 'created_by' => $user->id,
+                'review_required_at' => $assessment->requiresReview() ? CarbonImmutable::now('UTC') : null,
+                'review_reason' => $assessment->requiresReview() ? $assessment->reason : null,
             ]);
         });
     }

@@ -6,6 +6,11 @@ namespace App\Providers;
 
 use App\Exceptions\UnsupportedCacheRepositoryException;
 use App\Models\PersonalAccessToken;
+use App\Services\Abuse\DnsResolver;
+use App\Services\Abuse\PublicSuffix;
+use App\Services\Abuse\StreamTlsProbe;
+use App\Services\Abuse\SystemDnsResolver;
+use App\Services\Abuse\TlsProbe;
 use App\Services\Analytics\AnalyticsSalt;
 use App\Services\Analytics\PendingClicks;
 use App\Services\EmailHasher;
@@ -17,6 +22,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -30,6 +36,9 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(AnalyticsSalt::class);
         $this->app->singleton(PendingClicks::class);
+        $this->app->singleton(PublicSuffix::class);
+        $this->app->bind(DnsResolver::class, SystemDnsResolver::class);
+        $this->app->bind(TlsProbe::class, StreamTlsProbe::class);
 
         $this->app->bind(Repository::class, function (Application $app): Repository {
             $repository = $app->make(CacheRepository::class);
@@ -95,6 +104,22 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('register', function (Request $request): Limit {
             return Limit::perDay(2)
                 ->by($this->fingerprint((string) $request->ip()));
+        });
+
+        // The reporter's address is hashed with the analytics salt under the
+        // `report` context and lives one hour in Valkey. It is never written
+        // to the report row, and never logged.
+        RateLimiter::for('report', function (Request $request): Limit {
+            $salt = $this->app->make(AnalyticsSalt::class)->current();
+
+            if ($salt === null) {
+                Log::warning('Report rate limiting disabled: the analytics salt is missing.');
+
+                return Limit::none();
+            }
+
+            return Limit::perHour((int) config('abuse.reports.rate_limit_per_hour', 5))
+                ->by(hash_hmac('sha256', (string) $request->ip().'|report', $salt));
         });
     }
 

@@ -110,7 +110,7 @@ Un domaine comme `leposte.fr` face à la marque `laposte.fr` n'est pas un probl�
 
 #### Fonctionnement
 
-1. Une liste d'environ **200 marques protégées**, versionnée dans le dépôt : banques, télécoms, livraison, administrations, marketplaces, services de paiement. Elle doit citer ses sources et se mettre à jour.
+1. Une liste d'environ **120 marques protégées** (D-132), versionnée dans le dépôt : banques, télécoms, livraison, administrations, marketplaces, services de paiement. Elle est courte et conservatrice, cite ses sources et se met à jour.
 2. Un job génère toutes les variantes de chaque marque — quelques centaines de milliers d'entrées — et les stocke dans `lookalike_domains`.
 3. À la création d'un lien : une seule requête indexée sur le domaine enregistrable, plus une vérification des labels du sous-domaine.
 

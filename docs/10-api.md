@@ -134,7 +134,8 @@ RFC 9457 (`application/problem+json`), plus un champ `code` stable pour les clie
 validation_failed, unauthorized, forbidden, scope_missing,
 link_not_found, link_expired, link_blocked, slug_taken, slug_reserved,
 destination_blocked, destination_private_address,
-rate_limited, account_locked, totp_required, email_unverified,
+rate_limited, account_locked, account_suspended, signups_closed,
+totp_required, email_unverified,
 quota_exceeded, not_found, method_not_allowed, server_error,
 totp_already_enabled, recovery_code_invalid,
 totp_invalid, token_revoked
@@ -305,7 +306,7 @@ X-Robots-Tag: noindex
 | Aucun `Set-Cookie` | Invariant testé en CI |
 | **Aucun interstitiel** | Pas de page « vous allez être redirigé », pas de compte à rebours, pas de `meta refresh`, pas de JavaScript. La réponse de succès n'a **aucun corps** |
 
-Les seules pages servies sur `iurl.fr` sont les états terminaux (`404`, `410`, `403`). Aucune ne redirige. Un interstitiel — même « pour la sécurité » — casserait le comptage, la latence, les aperçus de liens et les QR, et rouvrirait la porte à un script sur le domaine de liens.
+Les seules pages servies sur `iurl.fr` sont les états terminaux (`404`, `410`, `403`), plus **une** redirection de service : `GET /report/{slug}` répond `302` vers le formulaire du domaine marketing, sans corps ni cookie, et ne compte jamais un clic. Aucune de ces réponses ne charge de script. Un interstitiel — même « pour la sécurité » — casserait le comptage, la latence, les aperçus de liens et les QR, et rouvrirait la porte à un script sur le domaine de liens.
 
 ### Pages d'erreur sur `iurl.fr`
 
@@ -327,6 +328,11 @@ Rendues par **Blade**, et par Blade uniquement : ces quatre pages sont la seule 
 | Domaine non vérifié | `404` | Ne pas révéler l'existence du domaine |
 
 **Un `404` et non un `403`** pour un slug inexistant : un `403` confirmerait l'existence d'un slug. Et un `410` et non un `404` pour un lien supprimé, pour que l'utilisateur ne recrée pas son lien en croyant à une erreur de frappe.
+
+Le pied de page de `403`, `404` et `410` porte un lien vers le formulaire de
+signalement, slug prérempli, construit depuis `DASHBOARD_URL`. C'est le seul
+endroit où une victime est déjà sur le domaine de liens. Le lien est un simple
+`<a href>` : toujours aucun script, aucune ressource externe.
 
 ---
 
@@ -398,7 +404,15 @@ Règles :
 | Domaine dans la blocklist | **Refus** `422`, code `destination_blocked` |
 | Adresse privée, loopback, metadata | **Refus** `422`, code `destination_private_address` |
 | Schéma non HTTP(S), identifiants dans l'URL | **Refus** `422` |
+| Scripts mélangés, homoglyphe connu, marque dans un sous-domaine tiers | **Refus** `422`, code `destination_blocked`, motif citable |
+| Typosquat seul | **Revue manuelle** : le lien est créé actif et porte `review_required_at` + `review_reason`, internes |
+| Typosquat et domaine de moins de 30 jours | **Refus** `422` |
 | Destination injoignable (timeout, DNS) | **Accepté.** Le site peut être temporairement down ou bloquer les robots. Refuser ici serait hostile et contournable. L'échec est journalisé et alimente une métrique |
 | Destination joignable et propre | **Accepté** |
+
+Un lien en revue reste actif : le typosquat seul ne bloque jamais. Le motif
+(`typosquat:substitution:laposte.fr`, `young_domain_login_path`, …) n'est jamais
+exposé par l'API ; il sert à la file de revue de l'opérateur et à la motivation
+d'un éventuel blocage ultérieur.
 
 Le principe : **on refuse sur une preuve de danger, jamais sur une absence de preuve de sûreté.**

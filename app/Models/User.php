@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedWithHash;
 use App\Models\Concerns\HasPublicId;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -18,6 +19,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * @property CarbonImmutable|null $suspended_at
+ */
 #[Fillable([
     'public_id',
     'email',
@@ -25,6 +29,7 @@ use Laravel\Sanctum\HasApiTokens;
     'email_verified_at',
     'totp_secret',
     'totp_confirmed_at',
+    'suspended_at',
 ])]
 #[Hidden([
     'email_hash',
@@ -47,6 +52,7 @@ class User extends Authenticatable
             'totp_secret' => 'encrypted',
             'email_verified_at' => 'immutable_datetime',
             'totp_confirmed_at' => 'immutable_datetime',
+            'suspended_at' => 'immutable_datetime',
             'deleted_at' => 'immutable_datetime',
         ];
     }
@@ -96,5 +102,14 @@ class User extends Authenticatable
     public function hasTotp(): bool
     {
         return $this->totp_confirmed_at !== null && $this->totp_secret !== null;
+    }
+
+    /**
+     * A suspended account keeps its session, its export and its tokens: only
+     * creating a link is refused (docs/04 §4.3).
+     */
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
     }
 }

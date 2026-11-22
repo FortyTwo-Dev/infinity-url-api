@@ -62,6 +62,26 @@ final class ProblemException extends RuntimeException
         );
     }
 
+    public static function accountSuspended(): self
+    {
+        return new self(
+            403,
+            'account_suspended',
+            'Account suspended',
+            'This account is suspended: creating a link is not allowed.',
+        );
+    }
+
+    public static function signupsClosed(): self
+    {
+        return new self(
+            403,
+            'signups_closed',
+            'Signups closed',
+            'New accounts are closed right now.',
+        );
+    }
+
     public static function linkBlocked(): self
     {
         return new self(
@@ -111,6 +131,30 @@ final class ProblemException extends RuntimeException
             'token_revoked',
             'Token revoked',
             'The token is no longer valid.',
+        );
+    }
+
+    public static function destinationBlocked(?string $detail = null): self
+    {
+        return new self(
+            422,
+            'destination_blocked',
+            'Destination blocked',
+            $detail === null
+                ? 'The destination is blocked.'
+                : 'The destination is blocked: '.$detail,
+        );
+    }
+
+    public static function destinationPrivateAddress(?string $detail = null): self
+    {
+        return new self(
+            422,
+            'destination_private_address',
+            'Private address not allowed',
+            $detail === null
+                ? 'The destination points to a private, loopback or metadata address.'
+                : 'The destination points to a private address: '.$detail,
         );
     }
 
