@@ -8,6 +8,11 @@ use Tests\Support\Api;
 
 uses(AnalyticsHelpers::class);
 
+const STATS_FROZEN_AT = '2026-11-22 10:00:00';
+const STATS_FIRST_DAY = '2026-11-20';
+const STATS_SECOND_DAY = '2026-11-21';
+const STATS_LAST_DAY = '2026-11-22';
+
 it('serves a daily series, devices and a click summary', function () {
     $this->travelTo(CarbonImmutable::parse('2026-11-21 10:00:00', 'UTC'));
 
@@ -16,8 +21,8 @@ it('serves a daily series, devices and a click summary', function () {
     Sanctum::actingAs($user, ['stats:read']);
 
     $response = $this->getJson(Api::linkStats($link->public_id, [
-        'from' => '2026-11-20',
-        'to' => '2026-11-21',
+        'from' => STATS_FIRST_DAY,
+        'to' => STATS_SECOND_DAY,
     ]));
 
     $response->assertOk();
@@ -36,8 +41,8 @@ it('serves a daily series, devices and a click summary', function () {
     ]);
 
     expect($body['link_id'])->toBe($link->public_id)
-        ->and($body['from'])->toBe('2026-11-20')
-        ->and($body['to'])->toBe('2026-11-21')
+        ->and($body['from'])->toBe(STATS_FIRST_DAY)
+        ->and($body['to'])->toBe(STATS_SECOND_DAY)
         ->and($body['clamped'])->toBeFalse()
         ->and($body['interval'])->toBe('day')
         ->and($body['retention_days'])->toBe(30);
@@ -48,10 +53,10 @@ it('serves a daily series, devices and a click summary', function () {
         expect($this->sortedKeys($item))->toBe(['clicks', 'date', 'uniques']);
     }
 
-    expect($body['series'][0]['date'])->toBe('2026-11-20')
+    expect($body['series'][0]['date'])->toBe(STATS_FIRST_DAY)
         ->and($body['series'][0]['clicks'])->toBe(5)
         ->and($body['series'][0]['uniques'])->toBe(3)
-        ->and($body['series'][1]['date'])->toBe('2026-11-21')
+        ->and($body['series'][1]['date'])->toBe(STATS_SECOND_DAY)
         ->and($body['series'][1]['clicks'])->toBe(7)
         ->and($body['series'][1]['uniques'])->toBe(5);
 
@@ -71,7 +76,7 @@ it('serves a daily series, devices and a click summary', function () {
 });
 
 it('defaults to the last thirty days', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsdefault1');
     $this->seedAnalyticsFixture($link);
@@ -83,31 +88,31 @@ it('defaults to the last thirty days', function () {
     $body = $response->json();
 
     expect($body['from'])->toBe('2026-10-24')
-        ->and($body['to'])->toBe('2026-11-22')
+        ->and($body['to'])->toBe(STATS_LAST_DAY)
         ->and($body['clamped'])->toBeFalse()
         ->and($body['retention_days'])->toBe(30);
 });
 
 it('clamps a range wider than the retention window', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsclamp1');
     Sanctum::actingAs($user, ['stats:read']);
 
     $response = $this->getJson(Api::linkStats($link->public_id, [
         'from' => '2026-01-01',
-        'to' => '2026-11-22',
+        'to' => STATS_LAST_DAY,
     ]));
 
     $response->assertOk();
 
     expect($response->json('from'))->toBe('2026-10-24');
-    expect($response->json('to'))->toBe('2026-11-22');
+    expect($response->json('to'))->toBe(STATS_LAST_DAY);
     expect($response->json('clamped'))->toBeTrue();
 });
 
 it('serves an empty series for a link without counters', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsempty1');
     Sanctum::actingAs($user, ['stats:read']);
@@ -122,7 +127,7 @@ it('serves an empty series for a link without counters', function () {
 });
 
 it('serves whole ISO weeks when the interval is week', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsweek1');
     $this->seedDailyStats($link->id, '2026-11-03', 4, 2);
@@ -170,12 +175,12 @@ it('serves whole ISO weeks when the interval is week', function () {
 
 dataset('invalid stats queries', [
     'unsupported interval' => [['interval' => 'month']],
-    'from after to' => [['from' => '2026-11-20', 'to' => '2026-11-19']],
+    'from after to' => [['from' => STATS_FIRST_DAY, 'to' => '2026-11-19']],
     'impossible date' => [['from' => '2026-13-01']],
 ]);
 
 it('rejects an invalid stats query', function (array $query) {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsinvalid1');
     Sanctum::actingAs($user, ['stats:read']);
@@ -188,7 +193,7 @@ it('rejects an invalid stats query', function (array $query) {
 })->with('invalid stats queries');
 
 it('requires the stats read scope', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsscope1');
     Sanctum::actingAs($user, ['links:read']);
@@ -201,11 +206,11 @@ it('requires the stats read scope', function () {
 });
 
 it('answers not found for another workspace link', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user] = $this->statsAccount('statsown1');
     [, , $otherLink] = $this->statsAccount('statsother1', 'other-stats@example.com');
-    $this->seedDailyStats($otherLink->id, '2026-11-21', 4, 2);
+    $this->seedDailyStats($otherLink->id, STATS_SECOND_DAY, 4, 2);
     Sanctum::actingAs($user, ['stats:read']);
 
     $this->assertProblem(
@@ -216,7 +221,7 @@ it('answers not found for another workspace link', function () {
 });
 
 it('answers not found for an unknown link id', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user] = $this->statsAccount('statsunknown1');
     Sanctum::actingAs($user, ['stats:read']);
@@ -229,7 +234,7 @@ it('answers not found for an unknown link id', function () {
 });
 
 it('leaves the link resource free of the seven day click counter', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(STATS_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('statsresource1');
     $this->seedAnalyticsFixture($link);

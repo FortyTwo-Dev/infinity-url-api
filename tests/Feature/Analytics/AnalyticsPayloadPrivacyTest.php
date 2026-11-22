@@ -9,6 +9,8 @@ use Tests\Support\AnalyticsHelpers;
 
 uses(AnalyticsHelpers::class);
 
+const PRIVACY_PROBE_DESTINATION = 'https://privacy-probe.example/secret';
+
 it('serializes no personal data in the analytics job', function () {
     Queue::fake();
     $this->travelTo(CarbonImmutable::parse('2026-11-21 10:00:00', 'UTC'));
@@ -16,12 +18,12 @@ it('serializes no personal data in the analytics job', function () {
     $domain = Domain::factory()->forHost('iurl.fr')->create();
     $link = Link::factory()->forDomain($domain)->create([
         'slug' => 'payloadprobe1',
-        'destination' => 'https://privacy-probe.example/secret',
+        'destination' => PRIVACY_PROBE_DESTINATION,
     ]);
 
     $this->withHeaders([
         'User-Agent' => 'PrivacyProbeUA/1.0',
-        'Referer' => 'https://privacy-probe.example/secret',
+        'Referer' => PRIVACY_PROBE_DESTINATION,
     ])->withServerVariables([
         'REMOTE_ADDR' => '203.0.113.42',
     ])->get('https://iurl.fr/payloadprobe1')->assertStatus(302);
@@ -37,7 +39,7 @@ it('serializes no personal data in the analytics job', function () {
 
     expect($serialized)->not->toContain('203.0.113.42');
     expect($serialized)->not->toContain('PrivacyProbeUA/1.0');
-    expect($serialized)->not->toContain('https://privacy-probe.example/secret');
+    expect($serialized)->not->toContain(PRIVACY_PROBE_DESTINATION);
     expect($serialized)->not->toContain('payloadprobe1');
     expect($serialized)->not->toContain('iurl.fr');
     expect($serialized)->not->toContain('country');

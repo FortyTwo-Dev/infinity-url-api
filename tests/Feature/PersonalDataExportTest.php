@@ -12,6 +12,8 @@ use Tests\Support\AnalyticsHelpers;
 uses(AnalyticsHelpers::class);
 
 const PERSONAL_DATA_EXPORT_API = 'https://api.url.infinityproject.fr';
+const EXPORT_PATH = '/v1/me/export';
+const EXPORT_STATS_DAY = '2026-11-20';
 
 /**
  * @param  array<string, mixed>  $value
@@ -63,7 +65,7 @@ it('exports exactly the allowlisted personal data', function () {
         'expires_at' => null,
     ]);
 
-    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.'/v1/me/export');
+    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.EXPORT_PATH);
     $response->assertOk();
 
     $body = $response->json();
@@ -138,9 +140,9 @@ it('exports the aggregated statistics of the workspace links', function () {
         'expires_at' => null,
     ]);
 
-    $this->seedDailyStats($link->id, '2026-11-20', 5, 3);
+    $this->seedDailyStats($link->id, EXPORT_STATS_DAY, 5, 3);
     $this->seedWeeklyStats($link->id, 2026, 47, 4);
-    $this->seedDeviceStats($link->id, '2026-11-20', 'mobile', 9);
+    $this->seedDeviceStats($link->id, EXPORT_STATS_DAY, 'mobile', 9);
 
     $otherWorkspace = Workspace::factory()->create(['name' => 'Other workspace']);
     $otherUser = User::factory()->create(['email' => 'other-stats-owner@example.com']);
@@ -153,11 +155,11 @@ it('exports the aggregated statistics of the workspace links', function () {
         'expires_at' => null,
     ]);
 
-    $this->seedDailyStats($otherLink->id, '2026-11-20', 9, 9);
+    $this->seedDailyStats($otherLink->id, EXPORT_STATS_DAY, 9, 9);
 
     Sanctum::actingAs($user, ['me:read']);
 
-    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.'/v1/me/export');
+    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.EXPORT_PATH);
     $response->assertOk();
 
     $body = $response->json();
@@ -174,7 +176,7 @@ it('exports the aggregated statistics of the workspace links', function () {
     expect($statistics['daily'])->toHaveCount(1);
     expect(personalDataExportSortedKeys($statistics['daily'][0]))
         ->toBe(['clicks', 'date', 'uniques']);
-    expect($statistics['daily'][0]['date'])->toBe('2026-11-20')
+    expect($statistics['daily'][0]['date'])->toBe(EXPORT_STATS_DAY)
         ->and($statistics['daily'][0]['clicks'])->toBe(5)
         ->and($statistics['daily'][0]['uniques'])->toBe(3);
 
@@ -228,7 +230,7 @@ it('drops the weekly buckets older than the retention window from the export', f
 
     Sanctum::actingAs($user, ['me:read']);
 
-    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.'/v1/me/export');
+    $response = $this->getJson(PERSONAL_DATA_EXPORT_API.EXPORT_PATH);
     $response->assertOk();
 
     $weekly = $response->json('statistics.0.weekly');

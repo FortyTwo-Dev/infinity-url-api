@@ -7,6 +7,8 @@ use Tests\Support\Api;
 
 uses(AnalyticsHelpers::class);
 
+const CSV_FROZEN_AT = '2026-11-22 10:00:00';
+
 /**
  * @return array<int, string>
  */
@@ -49,7 +51,7 @@ it('exports the daily series as csv', function () {
 });
 
 it('exports the weekly series as csv', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(CSV_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('csvweek1');
     $this->seedWeeklyStats($link->id, 2026, 45, 2);
@@ -79,7 +81,7 @@ it('exports the weekly series as csv', function () {
 });
 
 it('requires the stats read scope on the csv export', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(CSV_FROZEN_AT, 'UTC'));
 
     [, $user, $link] = $this->statsAccount('csvscope1');
     Sanctum::actingAs($user, ['links:read']);
@@ -92,7 +94,7 @@ it('requires the stats read scope on the csv export', function () {
 });
 
 it('answers not found for another workspace link on the csv export', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-22 10:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse(CSV_FROZEN_AT, 'UTC'));
 
     [, $user] = $this->statsAccount('csvown1');
     [, , $otherLink] = $this->statsAccount('csvother1', 'other-csv@example.com');

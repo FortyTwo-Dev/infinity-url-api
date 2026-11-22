@@ -5,13 +5,15 @@ use Carbon\CarbonImmutable;
 use Cron\CronExpression;
 use Illuminate\Console\Scheduling\Schedule;
 
+const SALT_PATTERN = '/^[0-9a-f]{64}$/';
+
 it('rotates the salt and destroys the previous one', function () {
     $salt = app(AnalyticsSalt::class);
     $path = $salt->path();
 
     $before = (string) file_get_contents($path);
 
-    expect($before)->toMatch('/^[0-9a-f]{64}$/');
+    expect($before)->toMatch(SALT_PATTERN);
 
     $this->artisan('analytics:rotate-salt')->assertSuccessful();
 
@@ -19,7 +21,7 @@ it('rotates the salt and destroys the previous one', function () {
 
     $after = (string) file_get_contents($path);
 
-    expect($after)->toMatch('/^[0-9a-f]{64}$/');
+    expect($after)->toMatch(SALT_PATTERN);
     expect($after)->not->toBe($before);
     expect(substr(sprintf('%o', fileperms($path)), -4))->toBe('0600');
 
@@ -45,13 +47,13 @@ it('serves the rotated salt immediately and rotates again within the same second
 
     $first = $salt->current();
 
-    expect($first)->toBeString()->toMatch('/^[0-9a-f]{64}$/');
+    expect($first)->toBeString()->toMatch(SALT_PATTERN);
 
     $this->artisan('analytics:rotate-salt')->assertSuccessful();
 
     $second = $salt->current();
 
-    expect($second)->toBeString()->toMatch('/^[0-9a-f]{64}$/');
+    expect($second)->toBeString()->toMatch(SALT_PATTERN);
     expect($second)->not->toBe($first);
 });
 

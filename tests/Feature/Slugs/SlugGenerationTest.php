@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\SlugGenerationFailedException;
 use App\Models\Domain;
 use App\Models\Link;
 use App\Services\ReservedSlugs;
@@ -102,4 +103,18 @@ it('retries when the slug is tombstoned', function () {
     $generator = slugGeneratorWithDraws();
 
     expect($generator->generate($domain))->toBe('baaaaaa');
+});
+
+it('fails when every candidate of the ten attempts is taken', function () {
+    $domain = slugGenerationDomain();
+
+    Link::factory()->forDomain($domain)->create(['slug' => 'aaaaaaa']);
+
+    $generator = new SlugGenerator(
+        app(ReservedSlugs::class),
+        fn (int $max): int => 0,
+    );
+
+    expect(fn () => $generator->generate($domain))
+        ->toThrow(SlugGenerationFailedException::class);
 });
