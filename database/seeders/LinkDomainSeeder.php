@@ -20,7 +20,7 @@ class LinkDomainSeeder extends Seeder
         );
 
         Domain::query()->firstOrCreate(
-            ['hostname' => 'iurl.fr'],
+            ['hostname' => (string) config('redirect.host')],
             [
                 'workspace_id' => $workspace->id,
                 'verification_token' => Str::random(32),

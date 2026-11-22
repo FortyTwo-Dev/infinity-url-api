@@ -50,11 +50,16 @@ final class ApiData
             ? $link->domain?->hostname
             : $link->domain()->value('hostname');
 
+        $base = config('redirect.url');
+        $shortUrl = is_string($base) && $base !== ''
+            ? rtrim($base, '/').'/'.$link->slug
+            : 'https://'.($host ?? config('redirect.host')).'/'.$link->slug;
+
         return [
             'id' => $link->public_id,
             'slug' => $link->slug,
             'destination' => $link->destination,
-            'short_url' => 'https://'.($host ?? config('redirect.host')).'/'.$link->slug,
+            'short_url' => $shortUrl,
             'status' => $link->status->value,
             'expires_at' => self::date($link->expires_at),
             'created_at' => self::date($link->created_at),

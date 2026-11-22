@@ -19,6 +19,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public short URL base
+    |--------------------------------------------------------------------------
+    |
+    | Optional. When set, the API builds `short_url` from this base instead of
+    | `https://{host}`. It exists for local development, where the API runs on
+    | a port and a local hostname: `http://iurl.test:8001`. Production leaves
+    | it empty and keeps the canonical HTTPS domain.
+    |
+    */
+
+    'url' => env('LINK_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache lifetimes
     |--------------------------------------------------------------------------
     |
