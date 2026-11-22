@@ -16,6 +16,7 @@ use App\Http\Controllers\Auth\VerifyTotpController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\LinkStatsController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TokenController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -70,3 +71,6 @@ Route::middleware('auth:sanctum')->group(function () use ($linkUri): void {
         ->middleware(['abilities:tokens:write', 'throttle:token-create']);
     Route::delete('tokens/{id}', [TokenController::class, 'destroy'])->middleware('abilities:tokens:write');
 });
+
+// Public by design: no session, no cookie, no ability, and always 202.
+Route::post('report', ReportController::class)->middleware('throttle:report');
