@@ -38,8 +38,16 @@ final class RestrictLinkHost
 
         $slug = $route->parameter('slug');
 
-        return $route->getName() === 'redirect'
-            && is_string($slug)
-            && rawurldecode($request->getPathInfo()) === '/'.$slug;
+        if (! is_string($slug) || $slug === '') {
+            return false;
+        }
+
+        $path = rawurldecode($request->getPathInfo());
+
+        return match ($route->getName()) {
+            'redirect' => $path === '/'.$slug,
+            'report.redirect' => $path === '/report/'.$slug,
+            default => false,
+        };
     }
 }
