@@ -49,6 +49,39 @@ function personalDataExportJsonKeys(mixed $value): array
     return $keys;
 }
 
+/**
+ * One workspace, its owner and one link on iurl.fr, ready for a stats export.
+ *
+ * @return array{workspace: Workspace, user: User, link: Link, domain: Domain}
+ */
+function personalDataExportStatsFixture(
+    string $workspaceName,
+    string $email,
+    string $slug,
+    string $destination,
+): array {
+    test()->seed(LinkDomainSeeder::class);
+
+    $workspace = Workspace::factory()->create(['name' => $workspaceName]);
+    $user = User::factory()->create(['email' => $email]);
+    $workspace->members()->attach($user->id, ['role' => 'owner']);
+
+    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
+    $link = Link::factory()->forDomain($domain)->create([
+        'workspace_id' => $workspace->id,
+        'slug' => $slug,
+        'destination' => $destination,
+        'expires_at' => null,
+    ]);
+
+    return [
+        'workspace' => $workspace,
+        'user' => $user,
+        'link' => $link,
+        'domain' => $domain,
+    ];
+}
+
 it('exports exactly the allowlisted personal data', function () {
     $this->seed(LinkDomainSeeder::class);
 
@@ -126,19 +159,12 @@ it('exports exactly the allowlisted personal data', function () {
 });
 
 it('exports the aggregated statistics of the workspace links', function () {
-    $this->seed(LinkDomainSeeder::class);
-
-    $workspace = Workspace::factory()->create(['name' => 'Stats workspace']);
-    $user = User::factory()->create(['email' => 'stats-owner@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-
-    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
-    $link = Link::factory()->forDomain($domain)->create([
-        'workspace_id' => $workspace->id,
-        'slug' => 'exportstats1',
-        'destination' => 'https://example.com/export-stats',
-        'expires_at' => null,
-    ]);
+    ['user' => $user, 'link' => $link, 'domain' => $domain] = personalDataExportStatsFixture(
+        'Stats workspace',
+        'stats-owner@example.com',
+        'exportstats1',
+        'https://example.com/export-stats',
+    );
 
     $this->seedDailyStats($link->id, EXPORT_STATS_DAY, 5, 3);
     $this->seedWeeklyStats($link->id, 2026, 47, 4);
@@ -208,19 +234,12 @@ it('drops the weekly buckets older than the retention window from the export', f
     $this->travelTo(CarbonImmutable::parse('2026-03-01 10:00:00', 'UTC'));
     config(['analytics.retention_days' => 30]);
 
-    $this->seed(LinkDomainSeeder::class);
-
-    $workspace = Workspace::factory()->create(['name' => 'Retained workspace']);
-    $user = User::factory()->create(['email' => 'retained-owner@example.com']);
-    $workspace->members()->attach($user->id, ['role' => 'owner']);
-
-    $domain = Domain::query()->where('hostname', 'iurl.fr')->firstOrFail();
-    $link = Link::factory()->forDomain($domain)->create([
-        'workspace_id' => $workspace->id,
-        'slug' => 'exportretained1',
-        'destination' => 'https://example.com/export-retained',
-        'expires_at' => null,
-    ]);
+    ['user' => $user, 'link' => $link] = personalDataExportStatsFixture(
+        'Retained workspace',
+        'retained-owner@example.com',
+        'exportretained1',
+        'https://example.com/export-retained',
+    );
 
     // The retained window opens on 2026-01-31, in ISO week 5: W4 is out.
     $this->seedWeeklyStats($link->id, 2026, 4, 7);

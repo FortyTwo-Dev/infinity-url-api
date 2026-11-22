@@ -23,10 +23,7 @@ it('counts one click and its unique', function () {
 
     $this->runClickJob($this->clickFor(ANALYTICS_VISITOR_IP, $link, ANALYTICS_CLICK_DAY));
 
-    expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->weeklyUniques($link->id, 2026, 47))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(1);
+    $this->expectCounters($link, ANALYTICS_CLICK_DAY, 1, 1, 1, 1);
 });
 
 it('counts a returning visitor twice but as a single unique', function () {
@@ -37,10 +34,7 @@ it('counts a returning visitor twice but as a single unique', function () {
     $this->runClickJob($this->clickFor(ANALYTICS_VISITOR_IP, $link, ANALYTICS_CLICK_DAY));
     $this->runClickJob($this->clickFor(ANALYTICS_VISITOR_IP, $link, ANALYTICS_CLICK_DAY));
 
-    expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(2);
-    expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->weeklyUniques($link->id, 2026, 47))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(2);
+    $this->expectCounters($link, ANALYTICS_CLICK_DAY, 2, 1, 1, 2);
 });
 
 it('scopes the dedup key to the link so two links do not correlate', function () {
@@ -53,10 +47,7 @@ it('scopes the dedup key to the link so two links do not correlate', function ()
     $this->runClickJob($this->clickFor(ANALYTICS_VISITOR_IP, $second, ANALYTICS_CLICK_DAY));
 
     foreach ([$first, $second] as $link) {
-        expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-        expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-        expect($this->weeklyUniques($link->id, 2026, 47))->toBe(1);
-        expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(1);
+        $this->expectCounters($link, ANALYTICS_CLICK_DAY, 1, 1, 1, 1);
     }
 });
 
@@ -69,13 +60,8 @@ it('keeps a visitor unique across two days of the same ISO week', function () {
     $this->travelTo(CarbonImmutable::parse('2026-11-22 12:00:00', 'UTC'));
     $this->runClickJob($this->clickFor(ANALYTICS_VISITOR_IP, $link, ANALYTICS_NEXT_DAY));
 
-    expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyClicks($link->id, ANALYTICS_NEXT_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_NEXT_DAY))->toBe(1);
-    expect($this->weeklyUniques($link->id, 2026, 47))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_NEXT_DAY, 'mobile'))->toBe(1);
+    $this->expectCounters($link, ANALYTICS_CLICK_DAY, 1, 1, 1, 1);
+    $this->expectCounters($link, ANALYTICS_NEXT_DAY, 1, 1, 1, 1);
 });
 
 it('counts a visitor unique again in the next ISO week', function () {
@@ -91,14 +77,8 @@ it('counts a visitor unique again in the next ISO week', function () {
     $this->travelTo(CarbonImmutable::parse('2026-11-23 12:00:00', 'UTC'));
     $this->runClickJob($this->clickFor(ANALYTICS_VISITOR_IP, $link, ANALYTICS_NEXT_WEEK_DAY));
 
-    expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyClicks($link->id, ANALYTICS_NEXT_WEEK_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_NEXT_WEEK_DAY))->toBe(1);
-    expect($this->weeklyUniques($link->id, 2026, 47))->toBe(1);
-    expect($this->weeklyUniques($link->id, 2026, 48))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_NEXT_WEEK_DAY, 'mobile'))->toBe(1);
+    $this->expectCounters($link, ANALYTICS_CLICK_DAY, 1, 1, 1, 1);
+    $this->expectCounters($link, ANALYTICS_NEXT_WEEK_DAY, 1, 1, 1, 1);
 });
 
 it('does not double the counters when the same job is retried', function () {
@@ -110,10 +90,7 @@ it('does not double the counters when the same job is retried', function () {
     $this->runClickJob($job, 'retried-job-uuid');
     $this->runClickJob($job, 'retried-job-uuid');
 
-    expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->weeklyUniques($link->id, 2026, 47))->toBe(1);
-    expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(1);
+    $this->expectCounters($link, ANALYTICS_CLICK_DAY, 1, 1, 1, 1);
 });
 
 it('never writes a country dimension', function () {
@@ -135,10 +112,7 @@ it('counts the click but no unique when the salt is missing', function () {
 
     $this->runClickJob($this->clickJob($link->id, ANALYTICS_CLICK_DAY, DeviceClass::Mobile, null, null));
 
-    expect($this->dailyClicks($link->id, ANALYTICS_CLICK_DAY))->toBe(1);
-    expect($this->dailyUniques($link->id, ANALYTICS_CLICK_DAY))->toBe(0);
-    expect($this->weeklyUniques($link->id, 2026, 47))->toBe(0);
-    expect($this->deviceClicks($link->id, ANALYTICS_CLICK_DAY, 'mobile'))->toBe(1);
+    $this->expectCounters($link, ANALYTICS_CLICK_DAY, 1, 0, 0, 1);
 });
 
 it('refuses to run without a queue wrapper', function () {

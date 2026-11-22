@@ -13,6 +13,7 @@ use App\Models\Workspace;
 use App\Services\Analytics\AnalyticsSalt;
 use App\Services\Analytics\DedupKey;
 use App\Services\Analytics\StatsStore;
+use Carbon\CarbonImmutable;
 use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -109,6 +110,27 @@ trait AnalyticsHelpers
         $this->seedWeeklyStats($link->id, 2026, 47, 4);
         $this->seedDeviceStats($link->id, '2026-11-20', 'mobile', 9);
         $this->seedDeviceStats($link->id, '2026-11-21', 'desktop', 3);
+    }
+
+    /**
+     * The four counters of one click day: daily clicks and uniques, the ISO
+     * week uniques and the mobile device clicks.
+     */
+    protected function expectCounters(
+        Link $link,
+        string $date,
+        int $clicks,
+        int $uniques,
+        int $weeklyUniques,
+        int $deviceClicks,
+    ): void {
+        $day = CarbonImmutable::parse($date, 'UTC');
+
+        expect($this->dailyClicks($link->id, $date))->toBe($clicks);
+        expect($this->dailyUniques($link->id, $date))->toBe($uniques);
+        expect($this->weeklyUniques($link->id, (int) $day->isoWeekYear(), (int) $day->isoWeek()))
+            ->toBe($weeklyUniques);
+        expect($this->deviceClicks($link->id, $date, 'mobile'))->toBe($deviceClicks);
     }
 
     protected function dailyClicks(int $linkId, string $date): int

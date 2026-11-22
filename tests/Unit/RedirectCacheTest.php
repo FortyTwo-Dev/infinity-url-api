@@ -5,6 +5,7 @@ use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\Store;
 use Illuminate\Support\Facades\Cache;
+use Tests\Support\LockReleaseFailedException;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -104,7 +105,7 @@ it('swallows a failing lock release', function () {
 
         public function release()
         {
-            throw new RuntimeException('release failed');
+            throw new LockReleaseFailedException;
         }
 
         public function owner()
