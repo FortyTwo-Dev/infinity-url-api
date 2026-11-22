@@ -177,10 +177,18 @@ En-têtes **IETF** `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` (
 | Renvoi d'email de vérification | 3 | 1 h |
 | Réinitialisation de mot de passe | 3 | 1 h |
 | **Redirection**, par IP | 1 200 | 1 min |
-| **404**, par IP | 60 | 1 min (anti-énumération) |
+| **404**, par IP | 60 | 1 min (anti-énumération, limiteur applicatif sur le chemin froid) |
 | Inscriptions | 2 comptes | 24 h par IP |
 
 Le seuil de redirection est volontairement haut : une entreprise derrière un NAT peut partager une IP. Un seuil bas casserait des liens parfaitement légitimes. L'anti-énumération se fait sur les `404`, pas sur les redirections réussies.
+
+Traefik porte le plafond global par IP (1 200/min) sur le routeur de liens, mais
+il limite des requêtes par routeur, pas des réponses par code : il ne peut pas
+distinguer un `302` d'un `404`. Le `60/min` sur les `404` est donc un limiteur
+applicatif, exécuté après la réponse sur le seul chemin froid : une redirection
+réussie ne consomme jamais ce budget. La clé est une empreinte HMAC de l'IP avec
+le sel analytique, jamais l'IP, et elle vit 60 secondes. Un Valkey indisponible
+sert le `404`.
 
 ---
 

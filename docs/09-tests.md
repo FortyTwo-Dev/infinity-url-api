@@ -48,6 +48,9 @@ C'est la partie la plus importante du document. Ces tests ne testent pas du code
 | **Hash d'index jamais exposé** | `email_hash` absent de toute réponse JSON et de tout payload | `tests/Feature/HashColumnsHiddenTest.php` |
 | **Rotation d'`APP_KEY` sans perte d'index** | Changer `app.key` ne modifie pas `EmailHasher::hash()` (clé dédiée) | `tests/Unit/BlindIndexKeyTest.php` |
 | **Export en allowlist** | `GET /me/export` ne renvoie que les clés déclarées par `PersonalDataInventory` | `tests/Feature/PersonalDataExportTest.php` |
+| **Aucune donnée personnelle dans la file** | Le job sérialisé ne contient ni IP, ni user-agent, ni destination, ni slug | `tests/Feature/Analytics/AnalyticsPayloadPrivacyTest.php` |
+| **Aucun unique cumulé** | Ni la réponse stats ni l'export ne somment `daily`, `weekly` ou `dim` | `tests/Feature/Analytics/StatsApiTest.php` |
+| **Aucune ligne pays** | `link_stats_dim` ne contient que des lignes `device` (D-120) | `tests/Feature/Analytics/AnalyticsJobTest.php` |
 | Purge des logs ≤ 72 h | La configuration de journalisation a un plafond dur ≤ 72 h | `tests/Feature/LogRetentionConfigTest.php` |
 | **Aucune route sans ability** | Toute route authentifiée déclare au moins une ability ; un jeton `refresh` ne peut atteindre aucun endpoint | `tests/Architecture/RouteAbilitiesTest.php` |
 

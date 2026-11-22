@@ -64,6 +64,11 @@ Deux empreintes, deux granularités, deux durées de vie :
 | Journalière | `u:d:{hashD}` | Jusqu'à minuit UTC, au plus tôt |
 | Hebdomadaire | `u:w:{hashW}` | Jusqu'à la prochaine rotation du sel (lundi 00:00 UTC) |
 
+Les deux clés survivent **une heure de plus** que leur bucket : un clic de 23h59
+dont le job tourne à 00h00 est ainsi dédupliqué normalement. Passé cette grâce,
+le bucket est fermé : le job compte le clic mais abandonne l'unique plutôt que
+de le compter deux fois.
+
 **Pourquoi deux et pas une.** Une seule clé ne peut produire qu'une granularité. Avec la seule clé hebdomadaire, un visiteur qui revient le mercredi ne serait pas compté dans les uniques du mercredi. L'empreinte journalière vit au plus 24 h : c'est la plus courte des deux, donc celle qui pèse le moins.
 
 ---
@@ -205,7 +210,10 @@ Le principe est asymétrique, et c'est volontaire :
 | `link_stats_dim` | 30 jours | Idem |
 | `failed_jobs` | 72 heures | `queue:prune-failed` |
 
-Supprimer un lien supprime ses compteurs par cascade. C'est la promesse d'effacement du LIA, et elle n'est tenable que parce qu'il n'existe pas de lignes de clic.
+Supprimer un lien supprime ses compteurs : la suppression logique efface
+explicitement les trois tables dans la même transaction, et la cascade de clé
+étrangère couvre l'effacement définitif. C'est la promesse d'effacement du LIA,
+et elle n'est tenable que parce qu'il n'existe pas de lignes de clic.
 
 ---
 

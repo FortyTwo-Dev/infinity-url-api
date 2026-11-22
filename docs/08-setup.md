@@ -147,6 +147,32 @@ GET http://api:8080/internal/tls/ask?domain=example.com
 - **Cloudflare en mode proxy** : fonctionne, mais le challenge HTTP-01 doit traverser. Documenter « proxy désactivé pendant la vérification » pour éviter les tickets.
 - **`/.well-known/acme-challenge`** doit rester accessible en HTTP. Ne pas forcer une redirection 301 globale avant que Traefik n'ait traité le challenge.
 
+### 3.5 Rate limiting de la redirection (S3)
+
+La configuration Traefik vit sur le serveur, hors de ce dépôt. Deux limites, deux
+endroits :
+
+```yaml
+http:
+  middlewares:
+    iurl-ratelimit:
+      rateLimit:
+        average: 1200
+        period: 1m
+        burst: 1200
+  routers:
+    iurl:
+      rule: Host(`iurl.fr`)
+      middlewares: [iurl-ratelimit]
+      service: api
+```
+
+`rateLimit` compte les requêtes par routeur, pas les réponses par code : Traefik
+ne peut pas limiter les seuls `404`. Le plafond ci-dessus couvre donc toute la
+redirection, et l'anti-énumération (60 `404` par minute et par IP empreintée au
+sel, TTL 60 s) est un limiteur applicatif exécuté après la réponse, sur le seul
+chemin froid. Voir l'ADR 0002.
+
 ---
 
 ## 5. Compose
@@ -250,6 +276,12 @@ Le sel mérite une explication, parce qu'il est le seul secret dont la destructi
 - la rotation écrit un nouveau fichier par `rename` atomique, puis **écrase** l'ancien avant de le supprimer ;
 - l'application relit le fichier au changement de `mtime`, sans redémarrage ;
 - les clés de dédup en Valkey expirent d'elles-mêmes au plus tard à la rotation suivante.
+
+**En développement**, le sel vit hors du dépôt, par exemple dans
+`~/.config/infinity-url/analytics.salt` en `0600`, et `ANALYTICS_SALT_PATH` du
+`.env` local pointe dessus. `php artisan analytics:rotate-salt` le crée ou le
+remplace. Les tests fabriquent leur propre fichier temporaire et ne lisent jamais
+celui du poste.
 
 `.env.example` est versionné, `.env` jamais. Les valeurs réelles vivent dans un gestionnaire de mots de passe, pas dans un fichier texte sur le VPS.
 

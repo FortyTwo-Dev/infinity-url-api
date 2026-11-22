@@ -38,7 +38,7 @@ final class MeController extends Controller
 
     #[OpenApiResponse(
         status: 200,
-        type: 'array{account: array{id: string, email: string, email_verified: bool, totp_enabled: bool, created_at: string|null}, workspace: array{id: string, name: string, plan: string, limits: array{active_links: int, custom_domains: int, stats_retention_days: int}}|null, links: list<array{id: string, slug: string, destination: string, short_url: string, status: string, expires_at: string|null, created_at: string|null, updated_at: string|null}>, statistics: list<mixed>}',
+        type: 'array{account: array{id: string, email: string, email_verified: bool, totp_enabled: bool, created_at: string|null}, workspace: array{id: string, name: string, plan: string, limits: array{active_links: int, custom_domains: int, stats_retention_days: int}}|null, links: list<array{id: string, slug: string, destination: string, short_url: string, status: string, expires_at: string|null, created_at: string|null, updated_at: string|null}>, statistics: list<array{link_id: string, daily: list<array{date: string, clicks: int, uniques: int}>, weekly: list<array{iso_year: int, iso_week: int, uniques: int}>, devices: list<array{device: string, clicks: int}>}>}',
     )]
     public function export(Request $request, ExportPersonalData $action): JsonResponse
     {

@@ -137,7 +137,7 @@ final class ResolveLink
             $link->status === LinkStatus::Blocked => RedirectResult::blocked(),
             $link->status === LinkStatus::Disabled => RedirectResult::goneExpired(),
             $link->expires_at !== null && ! $link->expires_at->isFuture() => RedirectResult::goneExpired(),
-            default => RedirectResult::redirect($link->destination, $link->expires_at),
+            default => RedirectResult::redirect($link->destination, $link->expires_at, (int) $link->id),
         };
     }
 

@@ -49,5 +49,25 @@ final class Api
 
     public const TOKENS = self::BASE.'/tokens';
 
+    /**
+     * @param  array<string, string|int>  $query
+     */
+    public static function linkStats(string $publicId, array $query = []): string
+    {
+        $url = self::LINKS.'/'.rawurlencode($publicId).'/stats';
+
+        return $query === [] ? $url : $url.'?'.http_build_query($query);
+    }
+
+    /**
+     * @param  array<string, string|int>  $query
+     */
+    public static function linkStatsCsv(string $publicId, array $query = []): string
+    {
+        $url = self::LINKS.'/'.rawurlencode($publicId).'/stats.csv';
+
+        return $query === [] ? $url : $url.'?'.http_build_query($query);
+    }
+
     public const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 }

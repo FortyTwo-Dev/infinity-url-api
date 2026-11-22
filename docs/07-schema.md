@@ -280,6 +280,12 @@ Ce n'est pas une limite technique, c'est la conséquence directe de la clé scop
 
 Le `date` est en UTC. Un visiteur français à 00h30 locales apparaît la veille. C'est documenté, et c'est cohérent avec la rotation du sel à lundi 00:00 UTC.
 
+**Suppression d'un lien.** La cascade `on delete cascade` ne couvre que
+l'effacement définitif (purge de compte, `forceDelete`). Un lien supprimé est
+seulement marqué `deleted_at` : l'action de suppression efface donc explicitement
+les trois tables de compteurs dans la même transaction, pour tenir la promesse
+d'effacement du LIA sans attendre une purge physique.
+
 ---
 
 ## 8. Blocklist
