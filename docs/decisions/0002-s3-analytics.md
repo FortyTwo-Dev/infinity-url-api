@@ -155,9 +155,11 @@ cache format literally.
   (D-122). It is a separate change.
 - `LogRetentionConfigTest` (docs/09 §2.2) does not exist; the 72-hour log bound
   is a journald deployment invariant, not application code.
-- The 100 % coverage gate on the dedup key and the retention calculation is not
-  wired in CI: the workflow installs no coverage driver. A clover-based check is
-  proposed as a separate CI change.
+- The 100 % coverage gate now runs in CI (PCOV plus
+  `scripts/check-coverage.php` over the clover report) for the five modules of
+  `docs/09 §5`. It replaced the previous absence of any coverage driver; the
+  first enforced run is the CI one, since the local toolchain has no coverage
+  extension.
 
 ## References
 

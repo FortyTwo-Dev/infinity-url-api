@@ -124,7 +124,7 @@ Le but est de détecter une régression — un N+1, un cache débranché, un mid
 | Job | Contenu |
 | --- | --- |
 | API — qualité | Pint, PHPStan niveau 6 |
-| API — tests | Unitaires, fonctionnels, invariants, intégration |
+| API — tests | Unitaires, fonctionnels, invariants, intégration, **porte de couverture** sur les cinq modules critiques (`scripts/check-coverage.php` sur le rapport clover, PCOV) |
 | API — sécurité | `composer audit` |
 | API — licences | Vérification qu'aucune dépendance `GPL-2.0-only` n'entre dans le projet |
 | Web — qualité | ESLint, `vue-tsc` |
@@ -146,7 +146,9 @@ Dépôt public ⇒ minutes GitHub Actions illimitées et gratuites. C'est un ava
 
 ## 5. Règle de couverture
 
-La couverture de 100 % n'est exigée que sur quatre modules, et vérifiée en CI :
+La couverture de 100 % n'est exigée que sur cinq modules, et vérifiée en CI
+par `scripts/check-coverage.php` sur le rapport clover généré avec PCOV. Un
+module absent du rapport est un échec, pas une dispense.
 
 | Module | Pourquoi |
 | --- | --- |
