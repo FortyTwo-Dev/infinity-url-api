@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use App\Support\Cursor;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -16,7 +17,7 @@ final class ListLinks
 {
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{data: Collection<int, Link>, next_cursor: string|null, has_more: bool}
+     * @return array{data: Collection<int, Link>, next_cursor: string|null, has_more: bool, clicks_7d: array<string, int>|null}
      */
     public function handle(Workspace $workspace, array $filters): array
     {
@@ -82,6 +83,9 @@ final class ListLinks
         $hasMore = $links->count() > $limit;
         $page = $links->take($limit);
         $last = $page->last();
+        $clicks = ($filters['include'] ?? null) === 'clicks_7d'
+            ? $this->sevenDayClicks($page)
+            : null;
 
         return [
             'data' => new Collection($page->all()),
@@ -92,6 +96,47 @@ final class ListLinks
                 ])
                 : null,
             'has_more' => $hasMore,
+            'clicks_7d' => $clicks,
         ];
+    }
+
+    /**
+     * One aggregate query for the whole page. A link without a row in the
+     * window is reported as zero, never omitted from the map.
+     *
+     * @param  Collection<int, Link>  $page
+     * @return array<string, int> keyed by public id
+     */
+    private function sevenDayClicks(Collection $page): array
+    {
+        $internalIds = [];
+        $publicIds = [];
+
+        foreach ($page as $link) {
+            $id = (int) $link->getKey();
+            $internalIds[] = $id;
+            $publicIds[$id] = $link->public_id;
+        }
+
+        if ($internalIds === []) {
+            return [];
+        }
+
+        $today = CarbonImmutable::now('UTC')->startOfDay();
+
+        $counts = DB::table('link_stats_daily')
+            ->whereIn('link_id', $internalIds)
+            ->whereBetween('date', [$today->subDays(6)->toDateString(), $today->toDateString()])
+            ->groupBy('link_id')
+            ->select('link_id', DB::raw('sum(clicks) as clicks'))
+            ->pluck('clicks', 'link_id');
+
+        $clicks = [];
+
+        foreach ($internalIds as $id) {
+            $clicks[$publicIds[$id]] = (int) ($counts[$id] ?? 0);
+        }
+
+        return $clicks;
     }
 }

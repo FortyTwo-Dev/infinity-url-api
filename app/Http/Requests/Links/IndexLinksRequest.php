@@ -25,6 +25,7 @@ final class IndexLinksRequest extends FormRequest
             'sort' => ['sometimes', 'string', 'in:created_at,-created_at'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'cursor' => ['sometimes', 'string'],
+            'include' => ['sometimes', 'string', 'in:clicks_7d'],
         ];
     }
 }
