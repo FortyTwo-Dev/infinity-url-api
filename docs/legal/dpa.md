@@ -14,10 +14,13 @@
 ## 1. Parties
 
 **Sous-traitant** : InfinityApp, entrepreneur individuel (micro-entreprise)
-SIREN : [À FOURNIR]
-RNE : [À FOURNIR]
-Adresse : [À FOURNIR]
-Contact : [À FOURNIR]
+SIREN : 934 964 255
+SIRET : 934 964 255 00012
+RNE : 934 964 255
+RCS : 934 964 255 R.C.S. Paris, inscrit le 7 novembre 2024
+Adresse : 8 B rue Abel, 75012 Paris
+Contact : the.fortytwo_dev@proton.me
+Source de l'identité : `infinity-qrcode/src/lib/legal.ts`
 
 **Responsable de traitement** : [Client : raison sociale]
 SIREN / numéro d'identification : [Client : …]
@@ -193,10 +196,12 @@ sont v0.2 et ne sont pas actifs (D-129, D-127).
 
 | Champ | Partie | Valeur |
 | --- | --- | --- |
-| SIREN | InfinityApp | [À FOURNIR] |
-| RNE | InfinityApp | [À FOURNIR] |
-| Adresse | InfinityApp | [À FOURNIR] |
-| Contact | InfinityApp | [À FOURNIR] |
+| SIREN | InfinityApp | 934 964 255 |
+| SIRET | InfinityApp | 934 964 255 00012 |
+| RNE | InfinityApp | 934 964 255 |
+| RCS | InfinityApp | 934 964 255 R.C.S. Paris, inscrit le 7 novembre 2024 |
+| Adresse | InfinityApp | 8 B rue Abel, 75012 Paris |
+| Contact | InfinityApp | the.fortytwo_dev@proton.me |
 | Raison sociale | Client | [Client : …] |
 | SIREN / identification | Client | [Client : …] |
 | Adresse | Client | [Client : …] |

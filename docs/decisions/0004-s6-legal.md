@@ -20,11 +20,12 @@ clauses. The rule is therefore source-first: every factual sentence of a future
 page must point at a file in `docs/` or a code path, and a sentence without a
 source is either removed or raised as a question.
 
-The identity data is not available yet: SIREN, RNE number, registered address,
-publication director, OVH registered office and the general contact address.
-S6.1 is therefore limited to the internal documents. S6.2 cannot start, and no
-public page can be merged, until those values are provided and the texts are
-reviewed.
+The identity data comes from the sibling project
+`infinity-qrcode/src/lib/legal.ts`: SIREN 934 964 255, SIRET 934 964 255 00012,
+RCS Paris, address 8 B rue Abel, 75012 Paris, contact
+the.fortytwo_dev@proton.me, publication director InfinityApp, host OVH SAS,
+2 rue Kellermann, 59100 Roubaix. No value is invented. S6.2 can start with
+those values; no public page is merged before the text review.
 
 The S5 code is merged and changes the factual base: destination inspection,
 anonymous reports, account suspension and the signup kill switch now exist.
@@ -43,6 +44,13 @@ The audit below checks the documents against that code, not against memory.
 - **The entity is InfinityApp, entrepreneur individuel (micro-entreprise).**
   "Infinity Project" is the public brand, never the contracting party (D-81,
   D-85).
+- **The publisher identity is taken from the sibling project.** The values come
+  from `infinity-qrcode/src/lib/legal.ts`: SIREN 934 964 255, SIRET
+  934 964 255 00012, RCS 934 964 255 R.C.S. Paris, address 8 B rue Abel, 75012
+  Paris, contact the.fortytwo_dev@proton.me, publication director InfinityApp,
+  host OVH SAS, 2 rue Kellermann, 59100 Roubaix. The RNE identifier is the
+  SIREN; the source publishes the RCS mention, not a separate RNE number. No
+  value is guessed.
 - **The public promise on reports is qualification under 48 hours.** The 24-hour
   acknowledgment of `docs/04 §4.2` becomes an internal target, not a public
   promise: no automatic email exists, and an anonymous report has no address to
@@ -95,11 +103,13 @@ from this table must not be published.
 | --- | --- |
 | The publisher is InfinityApp, entrepreneur individuel (micro-entreprise) | D-81, `docs/00` |
 | "Infinity Project" is the public brand, not the contracting party | D-85, `docs/00` |
-| SIREN, RNE number, registered address, publication director | `[À FOURNIR]` |
-| The host is OVH | D-60, `docs/03 §7` |
-| OVH registered office | `[À FOURNIR]` |
+| SIREN 934 964 255, SIRET 934 964 255 00012, RCS Paris, address 8 B rue Abel, 75012 Paris | `infinity-qrcode/src/lib/legal.ts` |
+| The RNE identifier is the SIREN 934 964 255 | `infinity-qrcode/src/lib/legal.ts`, D-81 |
+| Publication director is InfinityApp | `infinity-qrcode/src/lib/legal.ts` |
+| The host is OVH SAS | D-60, `docs/03 §7`, `infinity-qrcode/src/lib/legal.ts` |
+| OVH registered office: 2 rue Kellermann, 59100 Roubaix, France | `infinity-qrcode/src/lib/legal.ts` |
 | Abuse contact is `abuse@iurl.fr` | `docs/04 §4.1`, `app/pages/abuse.vue` |
-| General contact address | `[À FOURNIR]` |
+| General contact is `the.fortytwo_dev@proton.me` | `infinity-qrcode/src/lib/legal.ts` |
 | The required mentions follow LCEN art. 6-III | Law, not a product fact |
 
 ### Terms
@@ -228,15 +238,15 @@ from this table must not be published.
 
 | # | Question | Status |
 | --- | --- | --- |
-| Q-01 | SIREN, RNE number, registered address, publication director, OVH registered office, general contact address | **Blocking S6.2 and the merge** |
+| Q-01 | SIREN, RNE number, registered address, publication director, OVH registered office, general contact address | **Resolved**: `infinity-qrcode/src/lib/legal.ts` |
 | Q-02 | Which message is the fourth of D-125, if any? | **Open until v0.1 validation**; the public text lists the three implemented messages |
 | Q-03 | Who reviews the legal texts, and on what date? | **Blocking the merge** |
 | Q-04 | Applicable law and jurisdiction clause | **To validate** |
 | Q-05 | Does the destination URL appear in the application log when a probe fails? | **To verify**; the LIA and the register must reflect the answer |
 | Q-06 | D-39 says a 12-month self-host default, while `config/analytics.php` and `.env.example` default to 30 days | **Open**; the S6 texts state the implemented 30-day default and do not change D-39 |
 
-The ADR stays `proposed`, and no page is merged, until Q-01 and Q-03 are
-answered.
+The ADR stays `proposed`, and no page is merged, until Q-03 is answered and the
+published texts are reviewed.
 
 ## Consequences
 

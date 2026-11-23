@@ -142,7 +142,7 @@ Attention à l'identité : les documents contractuels et les mentions légales n
 
 | Document | Statut |
 | --- | --- |
-| Mentions légales (LCEN art. 6-III) | **À publier en S6.2**, prose prévue dans `app/lib/legal/fr.ts`. Doit contenir : identité `InfinityApp`, statut d'entrepreneur individuel, SIREN, adresse, numéro RNE, hébergeur (OVH) et son adresse, directeur de la publication, contact. **En attente des données d'identité et de la relecture** |
+| Mentions légales (LCEN art. 6-III) | **À publier en S6.2**, prose prévue dans `app/lib/legal/fr.ts`. Contient : identité `InfinityApp`, statut d'entrepreneur individuel, SIREN 934 964 255, SIRET 934 964 255 00012, RCS Paris, adresse 8 B rue Abel, 75012 Paris, hébergeur OVH SAS et son adresse, directeur de la publication, contact `the.fortytwo_dev@proton.me`. **Données disponibles ; en attente de la relecture** |
 | Politique de confidentialité (site + application) | **À publier en S6.2**, routes `/legal/privacy` et `/en/legal/privacy` |
 | CGU, avec mention explicite de l'absence de SLA et clause de limitation de responsabilité | **À publier en S6.2**, route `/legal/terms` |
 | AUP (politique d'usage acceptable) | **À publier en S6.2**, route `/legal/aup`, adossée à `04-abus-et-domaines.md` |

@@ -1,8 +1,9 @@
 # 06 — Analyses d'intérêt légitime (LIA)
 
 **Entité** : InfinityApp, entrepreneur individuel (micro-entreprise)
-**SIREN** : [À FOURNIR]
-**Adresse** : [À FOURNIR]
+**SIREN** : 934 964 255
+**Adresse** : 8 B rue Abel, 75012 Paris
+**Source de l'identité** : `infinity-qrcode/src/lib/legal.ts`
 **Version** : 1.1 — brouillon
 **Date de rédaction** : 2026-11-21
 **Date de révision** : 2026-11-23

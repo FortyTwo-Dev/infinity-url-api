@@ -5,8 +5,9 @@
 > d'une autorité de contrôle, d'un client ou d'un DPO, et ne se publie pas.
 
 **Entité** : InfinityApp, entrepreneur individuel (micro-entreprise)
-**SIREN** : [À FOURNIR]
-**Adresse** : [À FOURNIR]
+**SIREN** : 934 964 255
+**Adresse** : 8 B rue Abel, 75012 Paris
+**Source de l'identité** : `infinity-qrcode/src/lib/legal.ts`
 **Version** : 1.0 — brouillon
 **Date** : 2026-11-23
 **Rédigé par** : [À FOURNIR]
