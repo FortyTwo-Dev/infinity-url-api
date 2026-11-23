@@ -264,6 +264,11 @@ published texts are reviewed.
   notice and the same French text, with `lang="fr"`.
 - The theme preference is disclosed, not removed. The dashboard and the public
   pages keep the toggle.
+- The quickstart was timed on a fresh clone: 3.6 s for `composer install` with a
+  warm cache, 0.33 s for `migrate`, 73 s for the Pest suite, and `/up` answered
+  `200` on port 8002. The 10-minute target of `docs/02 §4.1` is not at risk on a
+  warm cache. The README now uses `php -d memory_limit=1G vendor/bin/pest`:
+  `php artisan test` exhausted the default 128 MB on this machine.
 
 ## Rejected alternatives
 
