@@ -103,6 +103,7 @@ from this table must not be published.
 | --- | --- |
 | The publisher is InfinityApp, entrepreneur individuel (micro-entreprise) | D-81, `docs/00` |
 | "Infinity Project" is the public brand, not the contracting party | D-85, `docs/00` |
+| The name, visual identity and texts remain the publisher's property; the AGPL covers the code only | D-74, `docs/00` |
 | SIREN 934 964 255, SIRET 934 964 255 00012, RCS Paris, address 8 B rue Abel, 75012 Paris | `infinity-qrcode/src/lib/legal.ts` |
 | The RNE identifier is the SIREN 934 964 255 | `infinity-qrcode/src/lib/legal.ts`, D-81 |
 | Publication director is InfinityApp | `infinity-qrcode/src/lib/legal.ts` |
@@ -119,6 +120,9 @@ from this table must not be published.
 | The service shortens a URL and redirects with a `302`, no interstitial | D-106, `docs/10 §8` |
 | An account and a verified email are required before the first link | D-22, `docs/02 §1`, `app/Actions/Links/CreateLink.php` |
 | The free plan allows five active links | D-21, `config/identity.php`, `app/Services/LinkQuota.php` |
+| One workspace is created per user; teams, roles and invitations are not available | `docs/02 §1-2`, `app/Actions/Auth/RegisterUser.php` |
+| TOTP two-factor authentication is available | `docs/02 §1`, `app/Http/Controllers/Auth/TwoFactorController.php` |
+| Links can expire; slugs are lowercase and some are reserved | `docs/02 §1`, D-50, D-135 |
 | A deleted or expired link answers `410`; a deleted slug is never reused | D-51, D-117, `docs/10 §8` |
 | Custom domains are not available in v0.1 | D-127 |
 | There is no SLA | D-27, `docs/02 §2` |
@@ -138,6 +142,7 @@ from this table must not be published.
 | Claim | Source |
 | --- | --- |
 | The link owner is responsible for the destination | `docs/04 §3.2`, §4.3 |
+| A verified email is required before the first link; registrations can be closed | D-22, D-66, `app/Actions/Auth/RegisterUser.php` |
 | Prohibited uses: phishing, malware, illegal content, evasion of a block | `docs/04 §3.1`, §4, `docs/02 §5` |
 | Spam, fraud and impersonation are prohibited | `docs/04 §4`, standard acceptable-use clause |
 | At creation, the destination is inspected once: scheme, DNS, private addresses, blocklists, typosquat, RDAP, TLS, redirects | `docs/04 §3.1`, `app/Services/Abuse/DestinationInspector.php` |
@@ -209,6 +214,7 @@ from this table must not be published.
 | The statistics are never cross-referenced between links and cannot identify the visitor | D-02, D-03, `docs/03 §4` |
 | The visitor can object by contacting the client | `docs/03 §4` |
 | The client must publish the clause and handle the objection | `docs/03 §4`, `docs/06 B.6` |
+| If the client does not publish the clause, the legitimate-interest analysis is not opposable to them | `docs/06 B.6` |
 
 ### Marketing page
 
