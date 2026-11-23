@@ -85,7 +85,7 @@ Texte à fournir, prêt à adapter. C'est la contrepartie de la condition 3 : sa
 >
 > Aucun cookie n'est déposé sur votre appareil. Aucune adresse IP n'est conservée. L'adresse IP est utilisée de façon transitoire pour produire une empreinte technique associée à un seul lien. Cette empreinte est supprimée au plus tard au bout d'une semaine et ne peut plus être recalculée ensuite.
 >
-> Ces statistiques ne permettent pas de vous identifier et ne sont jamais recoupées entre plusieurs liens. Vous pouvez vous opposer à ce traitement en nous contactant à l'adresse indiquée ci-dessous : [À FOURNIR : adresse de contact du client].
+> Ces statistiques ne permettent pas de vous identifier et ne sont jamais recoupées entre plusieurs liens. Vous pouvez vous opposer à ce traitement en nous contactant à l'adresse indiquée dans notre politique de confidentialité.
 
 Le client reste responsable de l'insertion de ce texte et de la gestion du droit d'opposition. Infinity URL doit documenter cette responsabilité dans son DPA.
 

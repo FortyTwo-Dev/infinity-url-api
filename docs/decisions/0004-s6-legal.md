@@ -123,7 +123,8 @@ from this table must not be published.
 | Custom domains are not available in v0.1 | D-127 |
 | There is no SLA | D-27, `docs/02 §2` |
 | There is no paid offer in v0.1 | D-127 |
-| Liability is limited; the clause does not cover regulatory sanctions | D-83 |
+| Liability is limited to direct and foreseeable damage; the clause does not cover regulatory sanctions | D-83; draft wording to validate |
+| French law and the Paris courts govern the contract | Draft wording, to validate (Q-04) |
 | Registrations can be closed without notice through a kill switch | D-66, `app/Actions/Auth/RegisterUser.php` |
 | A malicious link can be blocked; the account can be suspended | `docs/04 §4.2`, §4.3, `app/Actions/Abuse/BlockLink.php`, `app/Actions/Abuse/SuspendAccount.php` |
 | A blocked link keeps its statistics; the owner is notified with the reason | `docs/04 §4.2`, `app/Mail/LinkBlocked.php` |
@@ -138,6 +139,7 @@ from this table must not be published.
 | --- | --- |
 | The link owner is responsible for the destination | `docs/04 §3.2`, §4.3 |
 | Prohibited uses: phishing, malware, illegal content, evasion of a block | `docs/04 §3.1`, §4, `docs/02 §5` |
+| Spam, fraud and impersonation are prohibited | `docs/04 §4`, standard acceptable-use clause |
 | At creation, the destination is inspected once: scheme, DNS, private addresses, blocklists, typosquat, RDAP, TLS, redirects | `docs/04 §3.1`, `app/Services/Abuse/DestinationInspector.php` |
 | The inspection sends a `HEAD`, then a ranged `GET`, follows at most three redirects, times out after three seconds and signs `InfinityURL-AbuseCheck/1.0` | `app/Services/Abuse/HttpDestinationProbe.php`, `config/abuse.php` |
 | The target site sees our address and the tested URL | `docs/04 §3.3`, `app/Services/Abuse/HttpDestinationProbe.php` |
