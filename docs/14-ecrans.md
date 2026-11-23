@@ -36,17 +36,20 @@ url.infinityproject.fr
 │   └── /settings/danger     suppression du compte
 ├── /report               signalement d'un lien (public, SSR, indexable)
 ├── /abuse                procédure d'abus, contact, DSA (public, SSR, prerender)
-└── /legal/terms  /legal/privacy  /legal/aup  /legal/notice
+└── /legal/notice  /legal/terms  /legal/aup  /legal/privacy
+    /legal/subcontractors  /legal/client-clause
 ```
 
 `iurl.fr` ne sert **aucune** de ces pages. Il ne fait que rediriger, sauf
 `GET /report/{slug}` qui répond `302` vers `/report?slug=…` : une redirection de
 service, sans corps ni cookie, jamais comptée comme un clic.
 
-`/report` et `/abuse` sont les deux **seules** pages publiques rendues côté
-serveur (`routeRules`), avec un layout public séparé : pas de shell authentifié,
-pas de capability, et un `robots: index, follow` qui surcharge le `noindex`
-global. Le dashboard et l'authentification restent en SPA.
+`/`, `/en`, `/report`, `/abuse` et les pages `/legal/*` sont les pages publiques
+rendues côté serveur (`routeRules`), avec un layout public séparé : pas de shell
+authentifié, pas de capability, et un `robots: index, follow` qui surcharge le
+`noindex` global. `/`, `/en`, `/abuse`, `/legal/*` et `/en/legal/*` sont
+prérendus ; `/report` est rendu à la demande. Le dashboard et l'authentification
+restent en SPA.
 
 ---
 
@@ -154,8 +157,33 @@ Le pied de page de `403`, `404` et `410` pointe ici, avec le slug déjà rempli.
 | Capability | **Aucune** : page publique, sans compte, sans cookie |
 | i18n | `abuse.page.*` |
 
-Aucun texte de politique d'usage acceptable : l'AUP est rédigée et validée en
-S6. Cette page est opérationnelle, pas contractuelle.
+La page est opérationnelle, pas contractuelle. L'AUP est publiée sur
+`/legal/aup` et la politique de confidentialité sur `/legal/privacy` ; `/abuse`
+y renvoie explicitement.
+
+### `/legal/*`
+
+| Champ | Valeur |
+| --- | --- |
+| Rôle | Publier les mentions légales, les CGU, l'AUP, la politique de confidentialité, la liste des sous-traitants et la clause client |
+| Action principale | Aucune : lecture. Les liens du pied de page permettent de passer d'un document à l'autre |
+| Données | Contenu statique du module `app/lib/legal/fr.ts` : titre, date de mise à jour, sections et paragraphes |
+| État vide | Sans objet |
+| État erreur | Slug inconnu → `404`. Aucune requête réseau, aucun formulaire |
+| Chargement | Aucun : pages prérendues |
+| Capability | **Aucune** : pages publiques, sans compte, sans cookie |
+| i18n | `legal.nav.*`, `legal.updated`, `legal.back`, `legal.englishNotice`. La prose légale vit dans `app/lib/legal/fr.ts`, pas dans les catalogues |
+
+Les six documents sont `/legal/notice`, `/legal/terms`, `/legal/aup`,
+`/legal/privacy`, `/legal/subcontractors` et `/legal/client-clause`. Les routes
+`/en/legal/*` servent le **même texte français**, avec l'avertissement traduit
+`legal.englishNotice` (« This legal document is published in French only; the
+French version prevails. ») et `lang="fr"` sur le document. Le français est la
+seule version normative en S6.
+
+Le pied de page du layout public et celui du dashboard portent les six liens,
+plus `/abuse`, `/report` et le lien « Code source ». Aucune page légale ne
+charge de police externe, de script tiers, de cookie ou de requête tierce.
 
 ---
 
@@ -174,7 +202,7 @@ S6. Cette page est opérationnelle, pas contractuelle.
 | `/settings/danger` | Supprimer le compte | « Supprimer définitivement » | — | `settings.danger.*` |
 | `/report` | Signaler un lien | « Signaler » | — | `abuse.report.*` |
 | `/abuse` | Procédure d'abus | « Signaler un lien » | — | `abuse.page.*` |
-| `/legal/*` | Mentions, CGU, AUP, confidentialité | aucun | — | `legal.*` |
+| `/legal/*` | Mentions, CGU, AUP, confidentialité, sous-traitants, clause client | aucun | — | `legal.nav.*`, `legal.updated`, `legal.back`, `legal.englishNotice` |
 
 Le secret d'un jeton API n'est affiché **qu'une fois**, à la création, avec une
 case à cocher « J'ai copié ce jeton » avant de pouvoir fermer. Même logique que
