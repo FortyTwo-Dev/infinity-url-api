@@ -1,12 +1,14 @@
 # 06 — Analyses d'intérêt légitime (LIA)
 
-**Entité** : InfinityApp, entrepreneur individuel (micro-entreprise) — SIREN à compléter
-**Adresse** : à compléter
-**Version** : 1.0 — brouillon
+**Entité** : InfinityApp, entrepreneur individuel (micro-entreprise)
+**SIREN** : [À FOURNIR]
+**Adresse** : [À FOURNIR]
+**Version** : 1.1 — brouillon
 **Date de rédaction** : 2026-11-21
-**Rédigé par** : à compléter
-**Validé par** : à compléter
-**Prochaine revue** : 2027-11-21, ou au premier déclencheur de la partie D
+**Date de révision** : 2026-11-23
+**Rédigé par** : [À FOURNIR]
+**Validé par** : [À FOURNIR]
+**Prochaine revue** : 2027-11-23, ou au premier déclencheur de la partie D
 **Statut** : brouillon de travail, non signé, non relu juridiquement
 
 > Ce document est une pièce interne. Il ne se dépose nulle part. Il se conserve, se date, se versionne, et se produit sur demande d'un client, d'un DPO ou d'une autorité de contrôle. Il ne remplace pas une relecture juridique avant publication des mentions destinées au public.
@@ -33,11 +35,11 @@ Le produit traite deux catégories de données pour deux responsables de traitem
 | Élément | Contenu |
 | --- | --- |
 | Finalité | Détecter et qualifier les tentatives d'atteinte au service, diagnostiquer les incidents, constituer la preuve en cas de contentieux, prévenir l'hébergement de liens malveillants |
-| Données | Adresse IP, date et heure, méthode HTTP, URI **sans query string**, code de statut, user-agent. Pour l'anti-abus : URL de destination fournie par l'utilisateur, résultat du contrôle. Signalements reçus : slug signalé, catégorie, texte libre, email facultatif chiffré — **jamais l'IP du rapporteur** |
-| Personnes concernées | Visiteurs des liens, utilisateurs du service, auteurs de tentatives d'atteinte |
-| Destinataires | Aucun. Accès restreint à l'exploitant |
-| Durée | Logs : 72 heures. Résultat du contrôle de destination : durée de vie du lien |
-| Sous-traitants | OVH (hébergement) |
+| Données | Logs d'accès : adresse IP (couche d'accès uniquement), date et heure, méthode HTTP, URI **sans query string**, code de statut. L'application n'écrit jamais l'IP dans ses propres journaux. Anti-abus : URL de destination fournie par l'utilisateur, domaine enregistrable envoyé à RDAP, résultat du contrôle, marqueurs de revue internes. Signalements : slug signalé, catégorie, texte libre, email facultatif chiffré — **jamais l'IP, l'user-agent, le referer ni l'empreinte de rate limiting du rapporteur**. Rate limiting des signalements : HMAC de l'IP avec le sel analytique, contexte `report`, TTL d'une heure, **jamais persisté** |
+| Personnes concernées | Visiteurs des liens, utilisateurs du service, auteurs de signalements, auteurs de tentatives d'atteinte |
+| Destinataires | Aucun destinataire commercial. Accès restreint à l'exploitant, y compris par ntfy auto-hébergé pour les alertes internes. Le site cible et le service RDAP reçoivent la requête de contrôle (voir A.5) ; ce ne sont pas des sous-traitants |
+| Durée | Logs : 72 heures. Marqueurs de revue : durée de vie du lien. Signalements : 12 mois, 90 jours si rejetés. Empreinte de rate limiting : 1 heure. Le résultat du contrôle n'est pas conservé en dehors des marqueurs de revue |
+| Sous-traitants | OVH (hébergement et emails). URLhaus/abuse.ch fournit un dump public, sans donnée client |
 
 ## A.2 Test de la finalité
 
@@ -57,8 +59,12 @@ Les personnes concernées ne subissent pas ce traitement comme une finalité ét
 - l'application n'écrit jamais l'IP dans ses propres logs ; seule la couche d'accès la voit ;
 - aucune IP n'est écrite en base de données ;
 - aucune donnée n'est croisée avec un autre service ni avec un autre client ;
-- un signalement n'est jamais relié à l'IP de son auteur : l'empreinte de rate limiting vit une heure et n'est pas enregistrée ;
-- les logs ne sont ni exportés, ni envoyés à un outil d'analyse tiers.
+- un signalement n'est jamais relié à l'IP de son auteur : l'empreinte de rate limiting vit une heure, n'est pas enregistrée et n'est jamais reliée à la ligne du signalement ;
+- la requête de contrôle de destination part une seule fois, à la création du lien, jamais au clic ;
+- seul le domaine enregistrable part à RDAP, jamais l'URL complète ;
+- le site cible voit notre IP et l'URL testée ; ce point est décrit dans l'AUP et dans la politique de confidentialité ;
+- aucun cinquième email n'est ajouté pour une suspension (D-125) ;
+- les logs ne sont ni exportés, ni envoyés à un outil d'analyse tiers ; les alertes d'erreur partent vers un ntfy auto-hébergé, sans adresse de visiteur.
 
 **Alternative moins intrusive examinée :** journaliser sans IP. Écartée, car elle rend impossible la qualification d'une attaque distribuée et la réponse à une réquisition.
 
@@ -66,13 +72,31 @@ Les personnes concernées ne subissent pas ce traitement comme une finalité ét
 
 | Attente des personnes | Impact |
 | --- | --- |
-| Ne pas être surveillé dans son navigation | Nul : seules les requêtes vers le service sont concernées |
+| Ne pas être surveillé dans sa navigation | Nul : seules les requêtes vers le service sont concernées |
 | Ne pas être identifié | Faible : IP conservée 72 h, sans croisement, sans profilage |
+| Ne pas être exposé à un tiers lors d'une création de lien | Faible : la requête part vers la destination choisie par l'utilisateur, qui voit notre IP et l'URL testée ; aucun visiteur n'est concerné |
+| Ne pas voir son domaine complet transmis à un registre | Nul : RDAP ne reçoit que le domaine enregistrable |
+| Ne pas voir son signalement relié à son identité | Nul : pas d'IP, pas d'user-agent, pas de referer, pas d'empreinte persistée ; l'email est facultatif et chiffré |
 | Pouvoir exercer ses droits | Oui : accès, effacement et opposition possibles, avec une fenêtre de 72 h qui rend la demande rarement utile mais jamais impossible |
 
 L'impact est faible et borné dans le temps. Les garanties (72 h, pas de query string, pas d'export, pas de croisement) sont proportionnées. L'intérêt légitime prévaut.
 
-## A.5 Conclusion LIA-1
+## A.5 Destinataires du contrôle de destination
+
+Deux tiers reçoivent une requête lorsque la vérification est activée :
+
+| Destinataire | Ce qu'il reçoit | Pourquoi |
+| --- | --- | --- |
+| Site cible, y compris les redirections suivies | Notre adresse IP, l'URL testée, l'en-tête `User-Agent: InfinityURL-AbuseCheck/1.0`, une requête `HEAD` puis un `GET` partiel | Vérifier que la destination répond et ne piège pas l'utilisateur |
+| Service RDAP et registre faisant autorité | Le domaine enregistrable uniquement | Connaître l'âge du domaine, signal qui généralise |
+
+Ce ne sont pas des sous-traitants : ils ne traitent pas de données pour notre
+compte, ils reçoivent une requête que nous émettons. Le site cible peut être
+hors UE ; l'URL testée est fournie par l'utilisateur, et aucun visiteur du lien
+n'est concerné. Les blocklists sont des dumps publics téléchargés une fois par
+jour : aucune URL client ne part vers un service de réputation (D-96).
+
+## A.6 Conclusion LIA-1
 
 L'intérêt légitime prévaut. Le traitement des logs de sécurité et des contrôles anti-abus peut reposer sur l'article 6.1.f du RGPD.
 
@@ -82,7 +106,7 @@ L'intérêt légitime prévaut. Le traitement des logs de sécurité et des cont
 
 ## B.1 Cadre
 
-Le client crée un lien, le diffuse, et souhaite savoir combien de fois il a été ouvert, depuis quel pays et sur quel type d'appareil. **Le client est responsable de traitement** : c'est lui qui poursuit l'intérêt, qui informe ses visiteurs et qui traite les demandes d'exercice de droits. InfinityApp agit comme sous-traitant, encadré par le DPA.
+Le client crée un lien, le diffuse, et souhaite savoir combien de fois il a été ouvert et sur quel type d'appareil. **Le pays est hors v0.1** (D-120) : la colonne existe en base, la dimension reste vide. **Le client est responsable de traitement** : c'est lui qui poursuit l'intérêt, qui informe ses visiteurs et qui traite les demandes d'exercice de droits. InfinityApp agit comme sous-traitant, encadré par le DPA.
 
 Ce document est donc une **analyse fournie au client**, que celui-ci adopte. Il ne le dispense ni de l'information des personnes (clause fournie en partie C.3) ni du traitement du droit d'opposition.
 
@@ -92,8 +116,8 @@ Le résultat conservé est un **compteur**, jamais une ligne par clic, jamais un
 
 | Élément | Contenu |
 | --- | --- |
-| Finalité | Mesurer l'audience d'un lien : nombre de clics, pays d'origine, classe d'appareil, visiteurs uniques par lien |
-| Données | Adresse IP (transitoire, jamais persistée) ; **deux empreintes** HMAC-SHA256 dérivées du même sel (une journalière, une hebdomadaire), la plus longue conservée au plus une semaine ; pays résolu ; classe d'appareil ; horodatage à la journée. Le user-agent est lu en mémoire, réduit à une classe, puis jeté. Les bots ne produisent aucun compteur |
+| Finalité | Mesurer l'audience d'un lien : nombre de clics, classe d'appareil, visiteurs uniques par lien. Le pays n'est pas traité en v0.1 (D-120) |
+| Données | Adresse IP (transitoire, jamais persistée) ; **deux empreintes** HMAC-SHA256 dérivées du même sel (une journalière, une hebdomadaire), la plus longue conservée au plus une semaine ; classe d'appareil ; horodatage à la journée. **Aucun pays en v0.1.** Le user-agent est lu en mémoire, réduit à une classe, puis jeté. Les bots ne produisent aucun compteur |
 | Personnes concernées | Visiteurs des liens |
 | Destinataires | Le client, sous forme agrégée uniquement |
 | Durée | Empreinte : jusqu'à la rotation du sel (≤ 7 jours). Agrégats : 30 jours sur l'instance hébergée, valeur configurable en self-host |
@@ -107,7 +131,7 @@ Le bénéficiaire est le client. L'intérêt est légitime parce qu'il est limit
 
 ## B.4 Test de la nécessité
 
-**Pourquoi une IP ?** Le pays ne peut pas être déterminé sans elle. Aucune alternative moins intrusive ne produit une géolocalisation à maille pays.
+**Pourquoi une IP ?** Elle est nécessaire pour compter les visiteurs uniques : sans identifiant, seuls les clics bruts sont mesurables. Le pays n'est pas traité en v0.1 (D-120) ; aucune alternative moins intrusive ne produit un comptage fiable.
 
 **Pourquoi une empreinte persistante une semaine ?** Le comptage des visiteurs uniques exige de reconnaître un même visiteur entre deux visites. Sans identifiant, seuls les clics bruts sont mesurables. Une semaine est la durée minimale qui permet une lecture hebdomadaire, qui est l'usage réel.
 
@@ -117,6 +141,7 @@ Le bénéficiaire est le client. L'intérêt est légitime parce qu'il est limit
 - elle est transformée par HMAC avec un secret **détruit** à la rotation ;
 - la clé intègre l'identifiant interne du lien, ce qui interdit toute corrélation entre deux liens et, a fortiori, entre deux clients ;
 - aucune donnée comportementale n'est dérivée : pas de pages vues, pas de parcours, pas de referer ;
+- aucune dimension pays en v0.1 (D-120) : la colonne existe, elle reste vide ;
 - le résultat conservé est un compteur, pas une personne ;
 - aucun cookie, aucun `localStorage`, aucun fingerprint, aucun pixel tiers sur le chemin de redirection.
 
@@ -183,6 +208,12 @@ Un LIA qui affirme n'a pas de valeur. Un LIA qui cite des artefacts vérifiables
 | Email chiffré au repos | `Crypt` (AES-256-GCM) sur `users.email` ; index aveugle HMAC dans `email_hash` avec `BLIND_INDEX_KEY` | Test : aucune valeur lisible dans `users.email` ; `email_hash` absent de toute réponse |
 | Clé d'index distincte d'`APP_KEY` | La rotation d'`APP_KEY` n'invalide pas l'unicité, contrairement au défaut SEC-8 identifié sur le projet Hytale | Test : changer `app.key` ne modifie pas `EmailHasher::hash()` |
 | Secrets non réversibles | Codes de récupération en argon2id, jetons API et refresh en SHA-256 | Revue de schéma + test d'introspection |
+| Signalement sans identifiant | `POST /v1/report` répond `202` dans tous les cas et ne pose aucun cookie ; `reports` ne contient ni IP, ni user-agent, ni referer, ni empreinte de rate limiting | `tests/Feature/Abuse/ReportTest.php`, `tests/Feature/Abuse/ReportRedirectTest.php` |
+| Contrôle de destination sans fuite d'URL client | RDAP ne reçoit que le domaine enregistrable ; les blocklists sont des dumps locaux ; le site cible reçoit la requête de contrôle, jamais un visiteur | `app/Services/Abuse/RdapClient.php`, `app/Services/Abuse/HttpDestinationProbe.php`, `tests/Feature/Abuse/DestinationInspectorTest.php` |
+| Aucun cinquième email | Trois classes de mail existent : `VerifyEmail`, `ResetPassword`, `LinkBlocked` ; la suspension ne crée aucun envoi | `app/Mail/`, `app/Actions/Abuse/SuspendAccount.php` |
+| Aucun pays en v0.1 | `link_stats_dim` ne reçoit que la dimension `device` | `tests/Feature/Analytics/AnalyticsJobTest.php` |
+| Préférence d'affichage locale | `localStorage` seulement, jamais transmise à l'API | `app/lib/theme/theme.ts` |
+| Export en allowlist | `GET /me/export` ne renvoie que les clés déclarées | `tests/Feature/PersonalDataExportTest.php` |
 
 ## C.2 Le test qui compte le plus
 
@@ -206,9 +237,9 @@ Reprise de `03-conformite.md` §4. Le client l'insère dans sa politique de conf
 
 > **Mesure d'audience des liens**
 >
-> Les liens courts créés avec ce service enregistrent, lors de chaque ouverture, des statistiques agrégées : nombre de clics, pays d'origine et type d'appareil. Ces statistiques servent uniquement à mesurer l'audience de nos liens.
+> Les liens courts créés avec ce service enregistrent, lors de chaque ouverture, des statistiques agrégées : nombre de clics et type d'appareil. Ces statistiques servent uniquement à mesurer l'audience de nos liens.
 >
-> Aucun cookie n'est déposé sur votre appareil. Aucune adresse IP n'est conservée. L'adresse IP est utilisée de façon transitoire pour déterminer le pays, puis transformée en une empreinte technique associée à un seul lien. Cette empreinte est supprimée au plus tard au bout d'une semaine et ne peut plus être recalculée ensuite.
+> Aucun cookie n'est déposé sur votre appareil. Aucune adresse IP n'est conservée. L'adresse IP est utilisée de façon transitoire pour produire une empreinte technique associée à un seul lien. Cette empreinte est supprimée au plus tard au bout d'une semaine et ne peut plus être recalculée ensuite.
 >
 > Ces statistiques ne permettent pas de vous identifier et ne sont jamais recoupées entre plusieurs liens. Vous pouvez vous opposer à ce traitement en nous contactant à l'adresse indiquée ci-dessous.
 
@@ -232,10 +263,17 @@ Le document devient faux dès que l'un de ces changements survient. Il doit alor
 - Ajout d'un sous-traitant hors UE sur le chemin des clics.
 - Ajout d'une fonctionnalité qui écrit sur le terminal du visiteur (cookie, `localStorage`, fingerprint).
 - Changement de la granularité des agrégats vers une ligne par clic.
+- Ajout du pays dans les statistiques, c'est-à-dire sortie de D-120.
+- Ajout d'une API de réputation interrogée par URL, ou de tout autre destinataire hors UE sur le contrôle de destination.
+- Ajout d'un cinquième email, notamment un email de suspension (D-125).
+- Ajout d'un modèle de langage dans le tri des signalements (D-129).
 
 ## D.3 Registre
 
-Ce document alimente le registre des activités de traitement (art. 30 RGPD), qui reste à rédiger. Une entrée par traitement : logs de sécurité, anti-abus, mesure d'audience, comptes, emails transactionnels.
+Ce document alimente le registre des activités de traitement (art. 30 RGPD),
+tenu dans [`15-registre-traitements.md`](15-registre-traitements.md). Une entrée
+par traitement : redirection, mesure d'audience, comptes, emails
+transactionnels, signalements, vérification de destination, logs et sauvegardes.
 
 ---
 
@@ -243,11 +281,11 @@ Ce document alimente le registre des activités de traitement (art. 30 RGPD), qu
 
 | | |
 | --- | --- |
-| Rédigé par | |
-| Date | |
-| Validé par | |
-| Date | |
-| Version | 1.0 |
-| Prochaine revue | 2027-11-21 |
+| Rédigé par | [À FOURNIR] |
+| Date | [À FOURNIR] |
+| Validé par | [À FOURNIR] |
+| Date | [À FOURNIR] |
+| Version | 1.1 |
+| Prochaine revue | 2027-11-23 |
 
 **Ce que la signature atteste** : que l'analyse a été faite, que les preuves de la partie C ont été vérifiées à la date indiquée, et que le responsable assume la conclusion. Elle n'atteste pas d'une validation juridique externe.

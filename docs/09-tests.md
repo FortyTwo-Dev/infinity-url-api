@@ -100,11 +100,12 @@ Le but est de détecter une régression — un N+1, un cache débranché, un mid
 - Tableau des liens : état vide, un lien, pagination, suppression.
 - Graphique : ne casse pas avec 0, 1 et 1 000 points.
 
-### 3.3 E2E (Playwright) — deux parcours
+### 3.3 E2E (Playwright) — les parcours
 
 1. **Le parcours qui justifie le produit** : inscription → email capturé par Mailpit → création d'un lien → ouverture dans un nouvel onglet → clic visible dans les statistiques.
 2. **Le parcours API** : création d'un lien avec un token Bearer, vérification de la réponse, des en-têtes de rate limit et de la forme de l'erreur.
 3. **Le parcours de signalement** : `/report?slug=…` → `202` avec une référence, aucun cookie, aucune requête tierce, puis `/abuse` à 360 px. L'API E2E tourne avec `ABUSE_CHECK_ENABLED=false`.
+4. **Le parcours légal et marketing** : chaque page `/legal/*` rend son contenu côté serveur avec `robots: index, follow` et `lang="fr"` ; `/en/legal/*` rend le même texte français et l'avertissement traduit ; `/` et `/en` sont prérendus, sans redirection ni session ; aucun cookie, aucune requête tierce, 360 px sans débordement, tous les liens internes du footer répondent.
 
 ### 3.4 Contrat de types
 

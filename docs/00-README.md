@@ -7,7 +7,7 @@
 **Dépôts** : `infinity-url` (produit) et `infinity-url-api` (API)
 **Licence** : AGPL-3.0-only
 **Statut** : conception, avant v0.1
-**Dernière mise à jour** : 2026-11-21
+**Dernière mise à jour** : 2026-11-23
 
 ---
 
@@ -65,7 +65,6 @@ Les corrections sont listées dans [`01-decisions.md`](01-decisions.md), section
 
 | Fichier | Objet |
 | --- | --- |
-| [00-Question.md](00-Question.md) | Boîte à questions tampon : en attente / traité |
 | [01-decisions.md](01-decisions.md) | Journal des décisions, corrections des docs antérieurs, décisions encore ouvertes |
 | [02-mvp-v0.1.md](02-mvp-v0.1.md) | Périmètre de la v0.1, ordre d'attaque, estimation, définition de « terminé » |
 | [03-conformite.md](03-conformite.md) | Cartographie des données, bases légales, renvoi vers le LIA, clause client, rétention |
@@ -79,7 +78,10 @@ Les corrections sont listées dans [`01-decisions.md`](01-decisions.md), section
 | [11-pipeline.md](11-pipeline.md) | Du clic au compteur : empreintes, idempotence des jobs, bots, modes de défaillance |
 | [12-uml.md](12-uml.md) | Cas d'usage, matrice de couverture, machines à états, diagrammes de séquence |
 | [14-ecrans.md](14-ecrans.md) | Inventaire des écrans du dashboard : rôle, états, capability, i18n |
-| [resources/brands/](resources/brands/) | Liste de départ des marques protégées et son attribution |
+| [15-registre-traitements.md](15-registre-traitements.md) | Registre des activités de traitement (art. 30 RGPD) |
+| [16-decision-dpia.md](16-decision-dpia.md) | Décision motivée de ne pas réaliser de DPIA, et déclencheurs de réexamen |
+| [legal/dpa.md](legal/dpa.md) | Modèle d'accord de sous-traitance, fourni sur demande, non publié |
+| [resources/brands/](../resources/brands/) | Liste de départ des marques protégées et son attribution |
 
 Le dossier **13 n'existe pas** : les dix arbitrages d'implémentation (D-117 à D-126) sont dans le pack ibrain, règle `link-behaviour`, pour être servis à l'agent au moment où il touche le code concerné.
 

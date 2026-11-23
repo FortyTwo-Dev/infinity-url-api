@@ -82,7 +82,31 @@ C'est le seul mécanisme d'anti-abus qui fonctionne sans surveillance des clics.
 
 ### 3.3 Consentement à la vérification
 
-La vérification signifie qu'Infinity URL émet une requête vers la destination, révélant son IP au site cible. Ce n'est pas un problème de conformité (l'URL est fournie par l'utilisateur, pas par un visiteur), mais cela doit être écrit dans l'AUP et dans la documentation, pour éviter toute surprise.
+La vérification signifie qu'Infinity URL émet une requête vers la destination,
+révélant son IP au site cible. Ce n'est pas un problème de conformité (l'URL est
+fournie par l'utilisateur, pas par un visiteur), mais cela doit être écrit dans
+l'AUP et dans la politique de confidentialité, pour éviter toute surprise.
+
+Ce que le site cible reçoit exactement :
+
+| Élément | Détail | Source |
+| --- | --- | --- |
+| Notre adresse IP | Celle du serveur qui exécute le contrôle | `app/Services/Abuse/HttpDestinationProbe.php` |
+| L'URL testée | Celle fournie par l'utilisateur, y compris son chemin et sa query string | idem |
+| Une requête `HEAD`, puis un `GET` partiel si nécessaire | `HEAD` d'abord, `Range: bytes=0-65535` ensuite, timeout de 3 s | `config/abuse.php` |
+| Jusqu'à trois redirections suivies | Chaque saut est résolu et vérifié à nouveau ; chaque hôte de redirection reçoit la requête | `HttpDestinationProbe` |
+| Un en-tête identifiable | `User-Agent: InfinityURL-AbuseCheck/1.0` | `config/abuse.php` |
+
+Ce que le service RDAP reçoit : **le domaine enregistrable seul**, jamais l'URL
+complète (`app/Services/Abuse/RdapClient.php`). Les blocklists sont des dumps
+publics téléchargés une fois par jour : aucune URL client ne part vers un
+service de réputation (D-96).
+
+Le site cible et le service RDAP ne sont pas des sous-traitants : ils reçoivent
+une requête que nous émettons, ils ne traitent pas de données pour notre compte.
+Ils peuvent être hors UE ; l'URL testée est fournie par l'utilisateur et aucun
+visiteur du lien n'est concerné. L'AUP et la politique de confidentialité le
+disent explicitement.
 
 ---
 
@@ -276,13 +300,18 @@ Trois conséquences, et elles sont volontaires :
 
 | Étape | Délai | Action |
 | --- | --- | --- |
-| 1 | Sous 24 h ouvrées | Accusé de réception |
+| 1 | Cible interne : 24 h ouvrées | Accusé de réception interne. **Ce n'est pas un engagement public** : aucun email automatique n'existe, et un signalement sans adresse ne peut pas être acquitté. Réponse possible si le rapporteur a laissé un email |
 | 2 | Sous 48 h | Qualification : malveillant / litigieux / infondé |
 | 3 | Immédiat après qualification | Si malveillant : le lien passe en `403` avec une page d'explication, l'utilisateur est suspendu, l'agrégat est conservé pour la traçabilité |
 | 4 | Sous 48 h | Notification à l'utilisateur concerné avec le motif (obligation de motivation, voir §5) |
 | 5 | Immédiat | Ajout du domaine de destination à la liste locale si récidive |
 
 Le lien bloqué doit renvoyer une page claire qui explique le blocage et propose `abuse@iurl.fr`, **sans rediriger**. `403` et non `404` : un `404` ferait croire à une erreur de l'utilisateur et pousserait à recréer le lien.
+
+L'engagement public est la **qualification sous 48 heures**, pas l'accusé sous
+24 heures. Le formulaire affiche « Nous traitons ce signalement sous 48 heures »
+et « Un humain qualifie chaque signalement sous 48 heures ». Les 24 heures
+ouvrées restent une cible interne ; aucun email automatique ne les matérialise.
 
 ### 4.3 Suspension de compte
 
