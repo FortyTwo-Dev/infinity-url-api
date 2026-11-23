@@ -55,6 +55,24 @@ restent en SPA.
 
 ## 2. Écrans détaillés
 
+### `/`
+
+| Champ | Valeur |
+| --- | --- |
+| Rôle | Présenter le produit, les promesses tenues et les points d’entrée. La page ne consulte pas la session et ne redirige plus |
+| Action principale | « Créer un compte », puis « Se connecter » |
+| Données | Contenu statique des catalogues `marketing.*` : produit, vie privée, offre v0.1, liens. Aucun appel API |
+| État vide | Sans objet : page de contenu |
+| État erreur | Aucun appel réseau : page prérendue, rien à échouer |
+| Chargement | Aucun : page prérendue |
+| Capability | **Aucune** : page publique, sans compte, sans cookie |
+| i18n | `marketing.*`, présent en `fr` et `en` |
+
+`/` est la version française et `/en` la version anglaise. Les deux sont
+prérendues, indexables (`robots: index, follow`), sans cookie et sans requête
+tierce. Le marketing reste bilingue ; seuls les textes légaux sont français.
+La page n’affirme ni prix, ni SLA, ni témoignage, ni logo tiers.
+
 ### `/links`
 
 | Champ | Valeur |
