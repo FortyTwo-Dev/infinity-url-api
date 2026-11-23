@@ -42,8 +42,9 @@ The audit below checks the documents against that code, not against memory.
   as a question. The audit table below is the contract between the documents and
   the published pages.
 - **The entity is InfinityApp, entrepreneur individuel (micro-entreprise).**
-  "Infinity Project" is the public brand, never the contracting party (D-81,
-  D-85).
+  "Infinity Project" is the public name, never the contracting party (D-81,
+  D-85). Neither "Infinity Project" nor "Infinity URL" is a registered
+  trademark: no filing has been made (D-82).
 - **The publisher identity is taken from the sibling project.** The values come
   from `infinity-qrcode/src/lib/legal.ts`: SIREN 934 964 255, SIRET
   934 964 255 00012, RCS 934 964 255 R.C.S. Paris, address 8 B rue Abel, 75012
@@ -102,8 +103,9 @@ from this table must not be published.
 | Claim | Source |
 | --- | --- |
 | The publisher is InfinityApp, entrepreneur individuel (micro-entreprise) | D-81, `docs/00` |
-| "Infinity Project" is the public brand, not the contracting party | D-85, `docs/00` |
-| The name, visual identity and texts remain the publisher's property; the AGPL covers the code only | D-74, `docs/00` |
+| "Infinity Project" is the public name, not the contracting party | D-85, `docs/00` |
+| Neither "Infinity Project" nor "Infinity URL" is a registered trademark | D-82, user confirmation |
+| The AGPL covers the code only; the names, visual identity and texts are outside it | D-74, `docs/00` |
 | SIREN 934 964 255, SIRET 934 964 255 00012, RCS Paris, address 8 B rue Abel, 75012 Paris | `infinity-qrcode/src/lib/legal.ts` |
 | The RNE identifier is the SIREN 934 964 255 | `infinity-qrcode/src/lib/legal.ts`, D-81 |
 | Publication director is InfinityApp | `infinity-qrcode/src/lib/legal.ts` |

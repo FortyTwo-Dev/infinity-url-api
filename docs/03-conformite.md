@@ -138,7 +138,7 @@ données pour notre compte.
 
 ## 7. Documents à produire avant l'ouverture publique
 
-Attention à l'identité : les documents contractuels et les mentions légales nomment **InfinityApp, entrepreneur individuel**, pas « Infinity Project » ni « Infinity URL » (D-81). « Infinity Project » est une marque : elle ne peut pas être partie à un contrat.
+Attention à l'identité : les documents contractuels et les mentions légales nomment **InfinityApp, entrepreneur individuel**, pas « Infinity Project » ni « Infinity URL » (D-81). « Infinity Project » est un nom public, pas une entité juridique : il ne peut pas être partie à un contrat. Ni « Infinity Project » ni « Infinity URL » ne sont des marques déposées (D-82) ; D-81 parle de « marque publique » au sens de nom de la maison.
 
 | Document | Statut |
 | --- | --- |
