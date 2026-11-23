@@ -244,7 +244,7 @@ from this table must not be published.
 | Q-02 | Which message is the fourth of D-125, if any? | **Open until v0.1 validation**; the public text lists the three implemented messages |
 | Q-03 | Who reviews the legal texts, and on what date? | **Blocking the merge** |
 | Q-04 | Applicable law and jurisdiction clause | **To validate** |
-| Q-05 | Does the destination URL appear in the application log when a probe fails? | **To verify**; the LIA and the register must reflect the answer |
+| Q-05 | Does the destination URL appear in the application log when a probe fails? | **Resolved by disclosure**: the exception can contain the tested URL, and the privacy policy says it is kept 72 hours in production. No code change in S6 |
 | Q-06 | D-39 says a 12-month self-host default, while `config/analytics.php` and `.env.example` default to 30 days | **Open**; the S6 texts state the implemented 30-day default and do not change D-39 |
 
 The ADR stays `proposed`, and no page is merged, until Q-03 is answered and the

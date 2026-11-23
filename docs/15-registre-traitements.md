@@ -149,7 +149,7 @@ public ne compte les messages.
 | Responsable | InfinityApp |
 | Finalité | Sécurité, diagnostic, preuve en cas de contentieux |
 | Base légale | Intérêt légitime (art. 6.1.f), documenté par le LIA-1 |
-| Données | Couche d'accès : IP, date et heure, méthode, URI sans query string, code de statut. Application : aucun `REMOTE_ADDR`. En cas d'échec d'un contrôle de destination, l'exception journalisée peut contenir l'URL testée (point à vérifier, Q-05 de l'ADR 0004) |
+| Données | Couche d'accès : IP, date et heure, méthode, URI sans query string, code de statut. Application : aucun `REMOTE_ADDR`. En cas d'échec d'un contrôle de destination, l'exception journalisée peut contenir l'URL testée ; elle est conservée 72 heures en production |
 | Personnes concernées | Visiteurs, utilisateurs, auteurs de tentatives d'atteinte |
 | Destinataires | L'exploitant ; ntfy auto-hébergé pour les erreurs `ERROR` et `CRITICAL` |
 | Transferts hors UE | Aucun |

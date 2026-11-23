@@ -58,7 +58,7 @@ L'ordre est dicté par le risque, pas par la dépendance technique. **Les domain
 | S4 — Dashboard | Liste, création, édition, page de stats (un graphique suffit), **export CSV**, QR via `@infinitylib/iqrcode-wasm` | 26–34 h |
 | S5 — Abus | **Score de destination à trois issues** (blocklist, RDAP, TLS, redirections) ; **typosquat déterministe** (liste courte sourcée, variantes précalculées, sous-domaine, scripts mélangés) ; **job de découverte de marques** ; motif citable ; `POST /report` anonyme ; `iurl.fr/report/{slug}` ; **page `/abuse`** (procédure, contact, DSA) ; takedown ; suspension ; kill switch ; purge et auto-surveillance de réputation. L'AUP est rédigée en S6 | 22–28 h |
 | S6 — Légal et docs | CGU, AUP, politique de confidentialité, page sous-traitants, clause client, LIA, README, quickstart self-host | 16–24 h |
-| S7 — Réorganisation et validation de l'interface | *(dépôt `infinity-url`)* Inventaire des écrans v0.1, vocabulaire de layout et découpage CSS sur le thème partagé, primitives réutilisables, quatre états, accessibilité, QA 360 px et 1280 px, ADR `0005-ui-organization`. Aucun changement d'API ni de comportement | 8–12 h |
+| S7 — Réorganisation et validation de l'interface | *(dépôt `infinity-url`)* Inventaire des écrans v0.1, vocabulaire de layout et découpage CSS sur le thème partagé, primitives réutilisables, quatre états, accessibilité, QA 360 px et 1280 px, ADR `0006-ui-organization`. Aucun changement d'API ni de comportement | 8–12 h |
 
 **Total : 145–204 h.** À 8–10 h par semaine : **3,5 à 6 mois**. Avec une marge de sécurité réaliste, compter 4 à 6 mois.
 
